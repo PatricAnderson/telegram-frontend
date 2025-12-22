@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
+// Substitua pelos seus links do Railway
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
 const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
@@ -10,7 +11,7 @@ export default function App() {
   const [status, setStatus] = useState("Ocioso");
   const [isRunning, setIsRunning] = useState(false);
   
-  // Estado de configuração expandido com filtros
+  // Estado de configuração
   const [config, setConfig] = useState({
     api_id: "", api_hash: "", bot_token: "", source_channel_id: "",
     post_interval_seconds: 60,
@@ -25,19 +26,20 @@ export default function App() {
   const [loginData, setLoginData] = useState({ phone: "", code: "", password: "", hash: "" });
 
   const logEndRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const profileInputRef = useRef(null); // Referência para o input de perfil
+  const fileInputRef = useRef(null); // Input para histórico
+  const profileInputRef = useRef(null); // Input para perfil
 
   // Validação de URL
-  useEffect(() => {
+  const checkUrl = () => {
     if (API_URL.includes("seu-backend-no-railway")) {
-      addLog("ERROR", "⚠️ CONFIGURAÇÃO PENDENTE: Edite App.jsx e coloque o URL do Railway.");
+      alert("Erro de Configuração!\n\nEdite o ficheiro App.jsx e coloque o URL do Railway na constante API_URL.");
+      return false;
     }
-  }, []);
+    return true;
+  };
 
-  // WebSocket
   useEffect(() => {
-    if (WS_URL.includes("seu-backend-no-railway")) return;
+    if (!checkUrl()) return;
     const ws = new WebSocket(WS_URL);
     ws.onmessage = (event) => {
       try {
@@ -53,9 +55,7 @@ export default function App() {
 
   const addLog = (level, msg) => setLogs(prev => [...prev, { level, msg, time: new Date().toLocaleTimeString() }]);
 
-  const checkUrl = () => !API_URL.includes("seu-backend-no-railway");
-
-  // --- Lógica de Carregar Perfil (Desktop JSON -> Web State) ---
+  // --- Lógica de Perfis ---
   const handleProfileLoadClick = () => profileInputRef.current.click();
 
   const handleProfileFileChange = (event) => {
@@ -66,11 +66,8 @@ export default function App() {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        
-        // Converte a estrutura plana do Desktop para a estrutura aninhada da Web
         const newChannels = [];
         for (let i = 1; i <= 5; i++) {
-          // Verifica se o canal está ativado no JSON (enable_channel_X)
           if (data[`enable_channel_${i}`] === true) {
             newChannels.push({
               num: i,
@@ -80,11 +77,8 @@ export default function App() {
             });
           }
         }
-
-        // Se nenhum canal for encontrado, mantém pelo menos um vazio
         if (newChannels.length === 0) newChannels.push({ num: 1, id: "", limit: 10, caption: "" });
 
-        // Atualiza o estado
         setConfig(prev => ({
           ...prev,
           api_id: parseInt(data.api_id) || prev.api_id,
@@ -97,16 +91,104 @@ export default function App() {
           filter_gifs: data.filter_gifs !== false,
           active_channels: newChannels
         }));
-
         addLog("SUCCESS", `Perfil carregado! ${newChannels.length} canais configurados.`);
       } catch (err) {
-        addLog("ERROR", "Erro ao ler ficheiro de perfil: " + err.message);
+        addLog("ERROR", "Erro ao ler perfil: " + err.message);
       }
     };
     reader.readAsText(file);
     event.target.value = null;
   };
 
+  // --- Lógica de Histórico ---
+  const handleImportHistoryClick = () => fileInputRef.current.click();
+
+  const handleHistoryFileChange = async (event) => {
+    if (!checkUrl()) return;
+    const file = event.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      addLog("INFO", "A enviar histórico...");
+      const res = await fetch(`${API_URL}/upload_history`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Erro no upload");
+      addLog("SUCCESS", `Histórico importado! Último ID: ${data.last_id}`);
+    } catch (e) { addLog("ERROR", `Falha na importação: ${e.message}`); }
+    event.target.value = null;
+  };
+
+  // --- Lógica de Login (RESTAURADA) ---
+  const handleLoginSubmit = async () => {
+    if (!checkUrl()) return;
+    try {
+      if (loginStep === 1) {
+        // Passo 1: Solicitar Código
+        const res = await fetch(`${API_URL}/auth/request_code`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            phone: loginData.phone, 
+            api_id: parseInt(config.api_id), 
+            api_hash: config.api_hash 
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Erro ao pedir código");
+        
+        if (data.status === "code_sent") {
+          setLoginData({ ...loginData, hash: data.hash });
+          setLoginStep(2);
+          addLog("INFO", "Código enviado para o seu Telegram.");
+        } else if (data.status === "authorized") {
+          alert("Já está autenticado!");
+          setShowLogin(false);
+          addLog("SUCCESS", "Já autenticado.");
+        }
+      } else if (loginStep === 2) {
+        // Passo 2: Enviar Código
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            phone: loginData.phone, 
+            code: loginData.code, 
+            phone_code_hash: loginData.hash 
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Erro no login");
+
+        if (data.status === "success") { 
+            setShowLogin(false); 
+            addLog("SUCCESS", "Login efetuado com sucesso!"); 
+        } else if (data.status === "2fa_required") {
+            setLoginStep(3);
+            addLog("INFO", "Autenticação de dois fatores necessária.");
+        }
+      } else if (loginStep === 3) {
+        // Passo 3: Enviar Senha 2FA
+        const res = await fetch(`${API_URL}/auth/2fa`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: loginData.password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Erro no 2FA");
+
+        if (data.status === "success") { 
+            setShowLogin(false); 
+            addLog("SUCCESS", "Login 2FA efetuado!"); 
+        }
+      }
+    } catch (e) { 
+        alert("Erro: " + e.message);
+        addLog("ERROR", "Erro no processo de login: " + e.message);
+    }
+  };
+
+  // --- Controlo do Bot ---
   const handleStart = async () => {
     if (!checkUrl()) return;
     try {
@@ -116,7 +198,8 @@ export default function App() {
         active_channels: config.active_channels.map(ch => ({
           ...ch,
           id: parseInt(ch.id) || 0,
-          limit: parseInt(ch.limit) || 0
+          limit: parseInt(ch.limit) || 0,
+          caption: ch.caption || ""
         }))
       };
       const res = await fetch(`${API_URL}/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -132,7 +215,7 @@ export default function App() {
     try { await fetch(`${API_URL}/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); }
   };
 
-  // Funções auxiliares de UI
+  // --- Gestão de Canais (UI) ---
   const updateChannel = (index, field, value) => {
     const newChannels = [...config.active_channels];
     newChannels[index][field] = value;
@@ -150,11 +233,6 @@ export default function App() {
     setConfig({ ...config, active_channels: newChannels });
   };
 
-  // Funções de Histórico e Login (Mantidas resumidas para focar na mudança)
-  const handleImportHistoryClick = () => fileInputRef.current.click();
-  const handleFileChange = async (event) => { /* Lógica de upload de histórico existente */ };
-  const handleLoginSubmit = async () => { /* Lógica de login existente */ };
-
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans p-6">
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -166,7 +244,6 @@ export default function App() {
               <Activity size={20} /> Configuração
             </h2>
             
-            {/* --- NOVO: Botão Carregar Perfil no topo --- */}
             <input type="file" ref={profileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleProfileFileChange} />
             <button 
               onClick={handleProfileLoadClick}
@@ -201,7 +278,6 @@ export default function App() {
               <div className="flex justify-between items-start mb-3">
                 <label className="text-sm font-semibold text-yellow-400 block">Origem</label>
                 
-                {/* --- NOVO: Checkboxes de Filtro --- */}
                 <div className="flex gap-3">
                   {['photos', 'videos', 'gifs'].map(type => (
                     <button 
@@ -259,7 +335,9 @@ export default function App() {
               <button onClick={() => setShowLogin(true)} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-medium transition flex justify-center items-center gap-2 text-sm">
                 <KeyRound size={16}/> Autenticar
               </button>
-              <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleFileChange} />
+              
+              <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleHistoryFileChange} />
+              
               <button onClick={handleImportHistoryClick} className="flex-1 bg-purple-600 hover:bg-purple-500 py-2 rounded font-medium transition flex justify-center items-center gap-2 text-sm">
                 <Upload size={16}/> Histórico
               </button>
@@ -292,7 +370,7 @@ export default function App() {
         </div>
       </div>
       
-      {/* Modal de Login (Omitido para poupar espaço, mas deve estar aqui) */}
+      {/* Modal de Login */}
       {showLogin && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="bg-gray-800 p-6 rounded-xl w-96 border border-gray-600">

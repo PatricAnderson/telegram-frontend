@@ -440,7 +440,7 @@ export default function App() {
         {/* Painel de Logs */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col h-[600px] sticky top-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-green-400"><Terminal size={20} /> Consola</h2>
+            <h2 className="text-xl font-bold flex items-center gap-2 text-green-400"><Terminal size={20} /> Console</h2>
             <div className="flex items-center gap-2">
                 {API_URL.includes("seu-backend") && <AlertTriangle className="text-yellow-500" size={20}/>}
                 <span className="text-xs px-2 py-1 bg-gray-700 rounded text-gray-300">Status: {status}</span>

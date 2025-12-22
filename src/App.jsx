@@ -2,17 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2 } from 'lucide-react';
 
 // URL do Backend no Railway
-const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
-const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
+const API_URL = "https://seu-backend-no-railway.app"; 
+const WS_URL = "wss://seu-backend-no-railway.app/ws";
 
 export default function App() {
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState("Ocioso");
   const [isRunning, setIsRunning] = useState(false);
+  
+  // Estado de configuração com suporte a múltiplos canais e legendas
   const [config, setConfig] = useState({
     api_id: "", api_hash: "", bot_token: "", source_channel_id: "",
     post_interval_seconds: 60,
-    active_channels: [{ num: 1, id: "", limit: 10 }]
+    active_channels: [{ num: 1, id: "", limit: 10, caption: "" }]
   });
   
   const [showLogin, setShowLogin] = useState(false);
@@ -44,13 +46,13 @@ export default function App() {
   const handleStart = async () => {
     try {
       setIsRunning(true);
-      // Garante que os IDs são números antes de enviar
       const payload = {
         ...config,
         active_channels: config.active_channels.map(ch => ({
           ...ch,
           id: parseInt(ch.id) || 0,
-          limit: parseInt(ch.limit) || 0
+          limit: parseInt(ch.limit) || 0,
+          caption: ch.caption || ""
         }))
       };
 
@@ -90,7 +92,6 @@ export default function App() {
     event.target.value = null;
   };
 
-  // --- Gestão de Canais ---
   const updateChannel = (index, field, value) => {
     const newChannels = [...config.active_channels];
     newChannels[index][field] = value;
@@ -102,13 +103,12 @@ export default function App() {
     const newNum = config.active_channels.length + 1;
     setConfig({
       ...config,
-      active_channels: [...config.active_channels, { num: newNum, id: "", limit: 10 }]
+      active_channels: [...config.active_channels, { num: newNum, id: "", limit: 10, caption: "" }]
     });
   };
 
   const removeChannel = (index) => {
     const newChannels = config.active_channels.filter((_, i) => i !== index);
-    // Renumera os canais
     newChannels.forEach((ch, i) => ch.num = i + 1);
     setConfig({ ...config, active_channels: newChannels });
   };
@@ -155,7 +155,7 @@ export default function App() {
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* Painel de Configuração */}
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-blue-400">
             <Activity size={20} /> Configuração do Bot
           </h2>
@@ -189,37 +189,50 @@ export default function App() {
                   value={config.source_channel_id} onChange={e => setConfig({...config, source_channel_id: parseInt(e.target.value) || ""})} />
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {config.active_channels.map((channel, index) => (
-                  <div key={index} className="flex gap-2 items-end bg-gray-800/50 p-2 rounded">
-                    <div className="flex-1">
-                      <label className="text-[10px] text-gray-400 font-bold block mb-1">Destino {channel.num}</label>
-                      <input 
-                        placeholder={`ID Canal ${channel.num}`} 
-                        className="w-full bg-gray-700 p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
-                        value={channel.id}
-                        type="number"
-                        onChange={(e) => updateChannel(index, 'id', e.target.value)}
+                  <div key={index} className="bg-gray-800/80 p-3 rounded border border-gray-600">
+                    <div className="flex gap-2 items-end mb-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 font-bold block mb-1">Destino {channel.num}</label>
+                        <input 
+                          placeholder={`ID Canal ${channel.num}`} 
+                          className="w-full bg-gray-700 p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+                          value={channel.id}
+                          type="number"
+                          onChange={(e) => updateChannel(index, 'id', e.target.value)}
+                        />
+                      </div>
+                      <div className="w-20">
+                        <label className="text-[10px] text-gray-400 block mb-1">Limite</label>
+                        <input 
+                          type="number"
+                          className="w-full bg-gray-700 p-2 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-green-500"
+                          value={channel.limit}
+                          onChange={(e) => updateChannel(index, 'limit', e.target.value)}
+                        />
+                      </div>
+                      {config.active_channels.length > 1 && (
+                        <button 
+                          onClick={() => removeChannel(index)} 
+                          className="h-[34px] w-[34px] flex items-center justify-center bg-red-500/20 text-red-400 rounded hover:bg-red-500/40 transition"
+                          title="Remover canal"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* --- NOVO: Campo de Legenda Personalizada --- */}
+                    <div>
+                      <label className="text-[10px] text-gray-400 block mb-1">Legenda Personalizada (Use {'{filename}'} para o nome do ficheiro)</label>
+                      <textarea 
+                        className="w-full bg-gray-700 p-2 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[60px]"
+                        placeholder="Ex: Nova Mídia! - {filename}"
+                        value={channel.caption}
+                        onChange={(e) => updateChannel(index, 'caption', e.target.value)}
                       />
                     </div>
-                    <div className="w-20">
-                      <label className="text-[10px] text-gray-400 block mb-1">Limite</label>
-                      <input 
-                        type="number"
-                        className="w-full bg-gray-700 p-2 rounded text-xs text-center focus:outline-none focus:ring-1 focus:ring-green-500"
-                        value={channel.limit}
-                        onChange={(e) => updateChannel(index, 'limit', e.target.value)}
-                      />
-                    </div>
-                    {config.active_channels.length > 1 && (
-                      <button 
-                        onClick={() => removeChannel(index)} 
-                        className="h-[34px] w-[34px] flex items-center justify-center bg-red-500/20 text-red-400 rounded hover:bg-red-500/40 transition"
-                        title="Remover canal"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -249,7 +262,7 @@ export default function App() {
         </div>
 
         {/* Painel de Execução e Logs */}
-        <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col h-[600px]">
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col h-[600px] sticky top-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2 text-green-400">
               <Terminal size={20} /> Consola

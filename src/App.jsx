@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2 } from 'lucide-react';
 
 // URL do Backend no Railway
-const API_URL = "https://seu-backend-no-railway.app"; 
-const WS_URL = "wss://seu-backend-no-railway.app/ws";
+const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
+const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
 export default function App() {
   const [logs, setLogs] = useState([]);

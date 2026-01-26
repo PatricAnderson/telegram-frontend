@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw } from 'lucide-react';
+import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
-// Exemplo: https://web-production-xxxx.up.railway.app
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
 const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
-const APP_NAME = "Painel do Cliente"; // Título na aba do navegador
+const APP_NAME = "Painel do Cliente";
 
 const DEFAULT_CONFIG = {
     api_id: "", api_hash: "", bot_token: "", source_channel_id: "",
@@ -16,18 +15,124 @@ const DEFAULT_CONFIG = {
     active_channels: [{ num: 1, id: "", limit: 10, caption: "" }]
 };
 
-// --- MODAL DE RENOVAÇÃO (PIX + CHAVE) ---
+// --- COMPONENTE: MODAL DE ADMINISTRAÇÃO ---
+const AdminPanel = ({ isOpen, onClose, authFetch }) => {
+    const [tab, setTab] = useState("users");
+    const [users, setUsers] = useState([]);
+    const [keys, setKeys] = useState({});
+    const [daysToAdd, setDaysToAdd] = useState(30);
+    const [genQuantity, setGenQuantity] = useState(1);
+
+    useEffect(() => { if (isOpen) { loadUsers(); loadKeys(); } }, [isOpen]);
+
+    const loadUsers = async () => { try { const res = await authFetch("/admin/users"); setUsers(await res.json()); } catch(e) { console.error(e); } };
+    const loadKeys = async () => { try { const res = await authFetch("/admin/keys"); setKeys(await res.json()); } catch(e) {} };
+
+    const handleAddTime = async (username) => {
+        try {
+            const res = await authFetch("/admin/add_time", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, days: parseInt(daysToAdd) })
+            });
+            if(res.ok) { alert("Tempo adicionado!"); loadUsers(); }
+        } catch(e) { alert(e.message); }
+    };
+
+    const handleGenKeys = async () => {
+        try {
+            const res = await authFetch("/admin/generate_keys", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ days: parseInt(daysToAdd), quantity: parseInt(genQuantity) })
+            });
+            if(res.ok) { alert("Chaves geradas!"); loadKeys(); }
+        } catch(e) { alert(e.message); }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/95 z-[70] flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="bg-gray-800 w-full max-w-4xl h-[80vh] rounded-xl border border-gray-600 flex flex-col relative shadow-2xl overflow-hidden">
+                <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-gray-900/50">
+                    <h2 className="text-2xl font-bold text-red-400 flex items-center gap-2"><Shield/> Administração</h2>
+                    <div className="flex gap-2">
+                        <button onClick={()=>setTab("users")} className={`px-4 py-2 rounded transition ${tab==="users"?"bg-red-900 text-white":"bg-gray-700 text-gray-400 hover:bg-gray-600"}`}>Utilizadores</button>
+                        <button onClick={()=>setTab("keys")} className={`px-4 py-2 rounded transition ${tab==="keys"?"bg-red-900 text-white":"bg-gray-700 text-gray-400 hover:bg-gray-600"}`}>Chaves</button>
+                        <button onClick={onClose} className="p-2 text-gray-400 hover:text-white"><X size={24}/></button>
+                    </div>
+                </div>
+                
+                <div className="flex-1 overflow-auto p-6 bg-gray-800">
+                    {tab === "users" && (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="text-gray-400 border-b border-gray-700 text-sm uppercase">
+                                        <th className="p-3">Utilizador</th>
+                                        <th className="p-3">Status</th>
+                                        <th className="p-3">Dias Restantes</th>
+                                        <th className="p-3">Adicionar Dias</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {users.map(u => (
+                                        <tr key={u.username} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition">
+                                            <td className="p-3 font-medium text-white">{u.username}</td>
+                                            <td className="p-3"><span className={`px-2 py-1 rounded text-xs font-bold ${u.active?"bg-green-900/50 text-green-400":"bg-red-900/50 text-red-400"}`}>{u.active?"ATIVO":"EXPIRADO"}</span></td>
+                                            <td className="p-3 text-gray-300">{u.days_left} dias</td>
+                                            <td className="p-3 flex gap-2 items-center">
+                                                <input type="number" className="w-16 bg-gray-900 border border-gray-600 p-1.5 rounded text-sm text-center text-white" value={daysToAdd} onChange={e=>setDaysToAdd(e.target.value)}/>
+                                                <button onClick={()=>handleAddTime(u.username)} className="bg-blue-600 px-3 py-1.5 rounded text-xs hover:bg-blue-500 text-white transition">Add</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    
+                    {tab === "keys" && (
+                        <div>
+                            <div className="flex gap-4 mb-6 bg-gray-900/50 p-4 rounded-lg border border-gray-700 items-end">
+                                <div>
+                                    <label className="text-xs text-gray-400 block mb-1">Duração (Dias)</label>
+                                    <input type="number" className="w-24 bg-gray-800 border border-gray-600 p-2 rounded text-white" value={daysToAdd} onChange={e=>setDaysToAdd(e.target.value)}/>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400 block mb-1">Quantidade</label>
+                                    <input type="number" className="w-24 bg-gray-800 border border-gray-600 p-2 rounded text-white" value={genQuantity} onChange={e=>setGenQuantity(e.target.value)}/>
+                                </div>
+                                <button onClick={handleGenKeys} className="bg-green-600 px-4 py-2 rounded hover:bg-green-500 text-white font-bold h-10 flex items-center gap-2"><PlusCircle size={16}/> Gerar Chaves</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {Object.entries(keys).map(([k, days]) => (
+                                    <div key={k} className="bg-gray-900 p-3 rounded border border-gray-700 flex justify-between items-center hover:border-gray-500 transition group">
+                                        <code className="text-sm text-yellow-400 font-mono tracking-wider">{k}</code>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-500 font-bold">{days}d</span>
+                                            <button onClick={() => navigator.clipboard.writeText(k)} className="text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition"><Copy size={14}/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- COMPONENTE: MODAL DE RENOVAÇÃO ---
 const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => {
-    const [mode, setMode] = useState("select"); // select, pix, key
+    const [mode, setMode] = useState("select");
     const [key, setKey] = useState("");
     const [pixData, setPixData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [planId, setPlanId] = useState(null);
 
-    // Limpa estado ao fechar/abrir
     useEffect(() => { if(isOpen) { setMode("select"); setPixData(null); setKey(""); setPlanId(null); } }, [isOpen]);
 
-    // Polling para verificar pagamento Pix
     useEffect(() => {
         let interval;
         if (isOpen && mode === "pix" && pixData && planId) {
@@ -35,14 +140,11 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
                 try {
                     const check = await authFetch(`/payment/check/${pixData.id}?plan_id=${planId}`);
                     const status = await check.json();
-                    
                     if (status.status === "approved") {
-                        clearInterval(interval);
                         alert("✅ Pagamento Aprovado! A sua assinatura foi renovada.");
-                        refreshStatus();
-                        onClose();
+                        refreshStatus(); onClose();
                     }
-                } catch(e) { console.error("Erro ao verificar pagamento", e); }
+                } catch(e) {}
             }, 5000);
         }
         return () => clearInterval(interval);
@@ -51,34 +153,25 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     if (!isOpen) return null;
 
     const handleCreatePix = async (pid) => {
-        setLoading(true);
-        setPlanId(pid);
+        setLoading(true); setPlanId(pid);
         try {
             const res = await authFetch("/payment/create_pix", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ plan_id: pid })
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan_id: pid })
             });
             const data = await res.json();
-            if (res.ok) {
-                setPixData(data);
-                setMode("pix");
-            } else alert("Erro: " + data.detail);
-        } catch (e) { alert("Erro de conexão: " + e.message); }
+            if (res.ok) { setPixData(data); setMode("pix"); } else alert("Erro: " + data.detail);
+        } catch (e) { alert("Erro de conexão"); }
         setLoading(false);
     };
 
     const handleKeyRedeem = async (e) => {
-        e.preventDefault();
-        setLoading(true);
+        e.preventDefault(); setLoading(true);
         try {
             const res = await authFetch("/subscription/redeem", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key })
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key })
             });
             const data = await res.json();
-            if (res.ok) { alert(data.message); refreshStatus(); onClose(); }
-            else alert(data.detail);
+            if (res.ok) { alert(data.message); refreshStatus(); onClose(); } else alert(data.detail);
         } catch (e) { alert(e.message); }
         setLoading(false);
     };
@@ -86,64 +179,32 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     return (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
             <div className="bg-gray-800 p-6 rounded-xl w-full max-w-md border border-gray-600 shadow-2xl relative">
-                {!isLocked && (
-                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button>
-                )}
+                {!isLocked && <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button>}
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white"><CreditCard className="text-green-500"/> Renovar Assinatura</h3>
                 
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
-                    <CreditCard className="text-green-500"/> Renovar Assinatura
-                </h3>
-
                 {mode === "select" && (
                     <div className="space-y-3">
-                        <button onClick={() => handleCreatePix("mensal")} className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 p-4 rounded-lg text-left flex justify-between items-center transition shadow-lg border border-blue-500/30">
-                            <span className="font-medium text-white">Mensal (30 Dias)</span>
-                            <span className="font-bold bg-blue-900/50 px-2 py-1 rounded text-white">R$ 29,90</span>
-                        </button>
-                        <button onClick={() => handleCreatePix("trimestral")} className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 p-4 rounded-lg text-left flex justify-between items-center transition shadow-lg border border-purple-500/30">
-                            <span className="font-medium text-white">Trimestral (90 Dias)</span>
-                            <span className="font-bold bg-purple-900/50 px-2 py-1 rounded text-white">R$ 79,90</span>
-                        </button>
-                        
-                        <div className="relative my-6">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-600"></div></div>
-                            <div className="relative flex justify-center text-sm"><span className="px-2 bg-gray-800 text-gray-500">ou</span></div>
-                        </div>
-
-                        <button onClick={() => setMode("key")} className="w-full bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-gray-300 flex justify-center items-center gap-2 transition">
-                            <KeyRound size={16}/> Tenho uma Chave de Licença
-                        </button>
+                        <button onClick={() => handleCreatePix("mensal")} className="w-full bg-blue-700 hover:bg-blue-600 p-4 rounded-lg flex justify-between items-center transition shadow-lg"><span className="font-medium text-white">Mensal (30 Dias)</span><span className="font-bold bg-blue-900/50 px-2 py-1 rounded text-white">R$ 29,90</span></button>
+                        <button onClick={() => handleCreatePix("trimestral")} className="w-full bg-purple-700 hover:bg-purple-600 p-4 rounded-lg flex justify-between items-center transition shadow-lg"><span className="font-medium text-white">Trimestral (90 Dias)</span><span className="font-bold bg-purple-900/50 px-2 py-1 rounded text-white">R$ 79,90</span></button>
+                        <div className="border-t border-gray-600 my-4 pt-4"><button onClick={() => setMode("key")} className="w-full bg-gray-700 p-3 rounded text-sm text-gray-300 flex justify-center gap-2 hover:text-white transition"><KeyRound size={16}/> Tenho uma Chave</button></div>
                     </div>
                 )}
-
+                
                 {mode === "pix" && pixData && (
-                    <div className="text-center">
-                        <p className="text-yellow-400 font-bold mb-4 text-lg">Pagamento Pendente</p>
-                        <div className="bg-white p-2 rounded inline-block mb-4 shadow-inner">
-                           <div className="w-48 h-48 flex items-center justify-center bg-gray-100 text-black text-xs p-4 break-words overflow-hidden relative">
-                                {pixData.qr_code_base64 ? 
-                                    <img src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} alt="QR Code" className="w-full h-full object-contain" /> :
-                                    <span className="text-center">QR Code Base64 indisponível.<br/>Use o Copia e Cola abaixo.</span>
-                                }
-                           </div>
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2 font-medium">Valor: <span className="text-white">R$ {pixData.amount.toFixed(2)}</span></p>
-                        
-                        <div className="flex flex-col gap-2">
-                            <button onClick={() => {navigator.clipboard.writeText(pixData.qr_code); alert("Copiado!");}} className="w-full bg-green-600 hover:bg-green-500 py-2 rounded flex items-center justify-center gap-2 font-bold transition text-white">
-                                <Copy size={16}/> Copiar Código Pix
-                            </button>
-                            <button onClick={() => setMode("select")} className="text-xs text-gray-500 hover:text-gray-300 mt-2">Cancelar / Voltar</button>
-                        </div>
-                        <p className="text-xs text-blue-400 mt-4 animate-pulse flex items-center justify-center gap-1"><RefreshCw size={12} className="animate-spin"/> A aguardar confirmação do banco...</p>
+                    <div className="text-center animate-fade-in">
+                        <p className="text-yellow-400 font-bold mb-4">Pagamento Pendente</p>
+                        <div className="bg-white p-2 rounded inline-block mb-4"><div className="w-48 h-48 flex items-center justify-center bg-gray-100 text-black text-xs p-2 overflow-hidden break-words">{pixData.qr_code_base64 ? <img src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} className="w-full h-full object-contain"/> : "QR Indisponível"}</div></div>
+                        <p className="text-white text-lg font-bold mb-4">R$ {pixData.amount.toFixed(2)}</p>
+                        <button onClick={() => {navigator.clipboard.writeText(pixData.qr_code); alert("Copiado!");}} className="w-full bg-green-600 hover:bg-green-500 py-2 rounded flex items-center justify-center gap-2 font-bold transition text-white mb-2"><Copy size={16}/> Copiar Código Pix</button>
+                        <button onClick={() => setMode("select")} className="text-xs text-gray-400 hover:text-white">Voltar</button>
+                        <p className="text-xs text-blue-400 mt-4 animate-pulse flex justify-center gap-1"><RefreshCw size={12} className="animate-spin"/> Aguardando confirmação...</p>
                     </div>
                 )}
-
+                
                 {mode === "key" && (
-                    <form onSubmit={handleKeyRedeem}>
-                        <label className="text-xs text-gray-400 block mb-2 text-left">Chave de 30 ou 90 dias</label>
-                        <input className="w-full bg-gray-700 p-3 rounded text-white mb-4 text-center font-mono uppercase tracking-widest border border-gray-600 focus:border-green-500 focus:outline-none" placeholder="XXXX-XXXX-XXXX" value={key} onChange={e => setKey(e.target.value)} required />
-                        <button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded font-bold text-white transition">{loading ? "A Validar..." : "Ativar Chave"}</button>
+                    <form onSubmit={handleKeyRedeem} className="animate-fade-in">
+                        <input className="w-full bg-gray-700 p-3 rounded text-white mb-4 text-center font-mono uppercase border border-gray-600 focus:border-green-500 outline-none tracking-widest" placeholder="XXXX-XXXX-XXXX" value={key} onChange={e => setKey(e.target.value)} required />
+                        <button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded font-bold text-white transition">{loading ? "Validando..." : "Ativar Chave"}</button>
                         <button type="button" onClick={() => setMode("select")} className="w-full mt-3 text-xs text-gray-400 hover:text-white">Voltar</button>
                     </form>
                 )}
@@ -152,116 +213,76 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     );
 };
 
-// --- COMPONENTE DE BLOQUEIO DE PAGAMENTO ---
 const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   <div className="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center p-4 bg-opacity-95 backdrop-blur-sm">
     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center border border-red-900/50">
-      <div className="w-20 h-20 bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6 ring-4 ring-red-900/10">
-        <Lock size={40} className="text-red-500" />
-      </div>
+      <Lock size={48} className="text-red-500 mx-auto mb-4" />
       <h2 className="text-2xl font-bold text-white mb-2">Acesso Expirado</h2>
-      <p className="text-gray-400 mb-8 leading-relaxed">
-        O seu período de subscrição terminou. Para continuar a automatizar os seus canais, renove o seu plano agora.
-      </p>
+      <p className="text-gray-400 mb-8">Sua assinatura terminou. Renove para continuar.</p>
       <div className="space-y-3">
-        <button onClick={onOpenRenew} className="w-full bg-green-600 hover:bg-green-500 text-white py-3.5 rounded-lg font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-green-900/20">
-          <CreditCard size={18} /> Renovar Acesso
-        </button>
-        <button onClick={onLogout} className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-3.5 rounded-lg font-medium transition">
-          Entrar com outra conta
-        </button>
+        <button onClick={onOpenRenew} className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold flex justify-center gap-2"><CreditCard size={18}/> Renovar Agora</button>
+        <button onClick={onLogout} className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-3 rounded font-medium">Sair</button>
       </div>
-      <p className="text-xs text-gray-600 mt-6">Precisa de ajuda? Contacte o suporte.</p>
     </div>
   </div>
 );
 
-// --- COMPONENTE DE LOGIN DO SISTEMA ---
 const SystemLogin = ({ onLogin }) => {
-  const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-
-    if (API_URL.includes("seu-backend-no-railway")) {
-        setError("ERRO CRÍTICO: Configure o API_URL no App.jsx!");
-        return;
-    }
-
-    const endpoint = isRegister ? "/register" : "/token";
-    const body = isRegister 
-      ? JSON.stringify({ username, password })
-      : new URLSearchParams({ username, password });
-    const headers = isRegister ? { "Content-Type": "application/json" } : { "Content-Type": "application/x-www-form-urlencoded" };
-
-    try {
-      const res = await fetch(`${API_URL}${endpoint}`, { method: "POST", headers, body });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Erro de conexão");
-      if (isRegister) { setIsRegister(false); setError("Conta criada com sucesso! Ganhou 3 dias de teste."); }
-      else onLogin(data.access_token, data.username);
-    } catch (err) { setError("Falha: " + err.message); }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4 font-sans text-gray-100">
-      <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-        
-        <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
-          <Activity className="text-blue-500"/> {APP_NAME}
-        </h2>
-        <p className="text-gray-500 text-sm mb-6">Automação inteligente para Telegram</p>
-        
-        {API_URL.includes("seu-backend-no-railway") && (
-            <div className="p-3 rounded mb-4 text-xs bg-yellow-900/30 text-yellow-200 border border-yellow-800/50">
-                ⚠️ <b>Setup:</b> Configure <code>API_URL</code> no código.
+    const [isRegister, setIsRegister] = useState(false);
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+  
+    const handleSubmit = async (e) => {
+      e.preventDefault(); setError("");
+      if (API_URL.includes("seu-backend-no-railway")) { setError("Configure API_URL no App.jsx!"); return; }
+      const endpoint = isRegister ? "/register" : "/token";
+      const body = isRegister ? JSON.stringify({ username, password }) : new URLSearchParams({ username, password });
+      const headers = isRegister ? { "Content-Type": "application/json" } : { "Content-Type": "application/x-www-form-urlencoded" };
+  
+      try {
+        const res = await fetch(`${API_URL}${endpoint}`, { method: "POST", headers, body });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Erro");
+        if (isRegister) { setIsRegister(false); setError("Conta criada com 3 dias grátis! Faça login."); }
+        else onLogin(data.access_token, data.username);
+      } catch (err) { setError(err.message); }
+    };
+  
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4 font-sans text-gray-100">
+        <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Activity className="text-blue-500"/> {APP_NAME}</h2>
+            <h3 className="text-xl text-white mb-4">{isRegister ? "Criar Nova Conta" : "Acesso ao Sistema"}</h3>
+            {error && <div className="p-3 rounded mb-4 text-sm bg-red-900/30 text-red-200 border border-red-800/50">{error}</div>}
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded text-white focus:border-blue-500 outline-none" placeholder="Utilizador" value={username} onChange={e => setUsername(e.target.value)} required />
+                <input type="password" className="w-full bg-gray-900 border border-gray-700 p-3 rounded text-white focus:border-blue-500 outline-none" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} required />
+                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded font-bold transition shadow-lg">{isRegister ? "Criar Conta Grátis" : "Entrar"}</button>
+            </form>
+            <div className="mt-6 text-center border-t border-gray-700 pt-4">
+                <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="text-sm text-gray-400 hover:text-white transition">{isRegister ? "Já tem conta? Entrar" : "Ainda não tem conta? Criar agora"}</button>
             </div>
-        )}
-
-        {error && <div className={`p-3 rounded mb-4 text-sm ${error.includes("sucesso") ? "bg-green-900/30 text-green-300 border border-green-800/50" : "bg-red-900/30 text-red-300 border border-red-800/50"}`}>{error}</div>}
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs text-gray-400 ml-1">Utilizador</label>
-            <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg text-white mt-1 focus:outline-none focus:border-blue-500 transition" placeholder="ex: admin" value={username} onChange={e => setUsername(e.target.value)} required />
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 ml-1">Senha</label>
-            <input type="password" className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg text-white mt-1 focus:outline-none focus:border-blue-500 transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
-          </div>
-          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold transition shadow-lg shadow-blue-900/20">
-            {isRegister ? "Criar Conta Grátis" : "Entrar no Painel"}
-          </button>
-        </form>
-        
-        <div className="mt-6 pt-6 border-t border-gray-700 text-center">
-            <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="text-sm text-gray-400 hover:text-white transition">
-            {isRegister ? "Já tem conta? Entrar" : "Ainda não tem conta? Criar agora"}
-            </button>
         </div>
       </div>
-    </div>
-  );
+    );
 };
 
-// --- COMPONENTE PRINCIPAL (DASHBOARD) ---
+// --- COMPONENTE PRINCIPAL ---
 export default function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem("authToken"));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("currentUser"));
   const [subscription, setSubscription] = useState({ active: true, daysLeft: 0 });
+  const [isAdmin, setIsAdmin] = useState(false);
   const [showRenewModal, setShowRenewModal] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
   
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState("Ocioso");
   const [isRunning, setIsRunning] = useState(false);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   
-  // Login Telegram State
   const [showLogin, setShowLogin] = useState(false);
   const [loginStep, setLoginStep] = useState(1);
   const [loginData, setLoginData] = useState({ phone: "", code: "", password: "", hash: "" });
@@ -297,18 +318,17 @@ export default function App() {
       try {
           const res = await authFetch("/user/status");
           const data = await res.json();
-          if (res.ok) setSubscription(data.subscription);
+          if (res.ok) {
+              setSubscription(data.subscription);
+              setIsAdmin(data.username === "admin");
+          }
       } catch (e) { console.error("Erro status:", e); }
   };
 
-  // Carregar dados iniciais e conectar WS
   useEffect(() => {
     if (authToken && !API_URL.includes("seu-backend")) {
         fetchUserStatus();
-        authFetch("/profile").then(r=>r.json()).then(d=>{
-            if(d.api_id) setConfig(p=>({...p, ...d}))
-        }).catch(()=>{});
-        
+        authFetch("/profile").then(r=>r.json()).then(d=>{ if(d.api_id) setConfig(p=>({...p, ...d})) }).catch(()=>{});
         const ws = new WebSocket(`${WS_URL}/${authToken}`);
         ws.onmessage = (e) => {
             try {
@@ -325,15 +345,7 @@ export default function App() {
   useEffect(() => logEndRef.current?.scrollIntoView({ behavior: "smooth" }), [logs]);
   const addLog = (level, msg) => setLogs(prev => [...prev, { level, msg, time: new Date().toLocaleTimeString() }]);
 
-  // --- Ações do Bot ---
-  const handleSaveProfile = async () => {
-      try {
-          const payload = { ...config, active_channels: config.active_channels.map(ch => ({ ...ch, id: parseInt(ch.id)||0, limit: parseInt(ch.limit)||0 })) };
-          await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-          addLog("SUCCESS", "Configurações salvas no servidor!");
-      } catch(e) { addLog("ERROR", "Erro ao salvar perfil."); }
-  };
-
+  const handleSaveProfile = async () => { try { await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }); addLog("SUCCESS", "Perfil salvo!"); } catch(e) { addLog("ERROR", "Erro ao salvar."); } };
   const handleStart = async () => {
       if (!subscription.active) { alert("Assinatura expirada!"); return; }
       try {
@@ -343,19 +355,9 @@ export default function App() {
           if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
       } catch (e) { addLog("ERROR", e.message); setIsRunning(false); }
   };
-
   const handleStop = async () => { try { await authFetch(`/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); } };
+  const handleResetHistory = async () => { if(isRunning) { alert("Pare o bot!"); return; } if(!confirm("Resetar?")) return; try { await authFetch("/reset_history", { method: "POST" }); addLog("SUCCESS", "Resetado!"); } catch(e) {} };
   
-  const handleResetHistory = async () => { 
-      if(isRunning) { alert("Pare o bot!"); return; }
-      if(!confirm("Resetar histórico para ZERO?")) return; 
-      try { 
-          await authFetch("/reset_history", { method: "POST" }); 
-          addLog("SUCCESS", "Histórico reiniciado."); 
-      } catch(e) { addLog("ERROR", e.message); } 
-  };
-
-  // --- Importações de Arquivo ---
   const handleProfileLoadClick = () => profileInputRef.current.click();
   const handleProfileFileChange = (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -391,14 +393,12 @@ export default function App() {
     event.target.value = null;
   };
 
-  // --- Auth Telegram ---
   const handleLoginSubmit = async () => {
     try {
         let res, data;
         if (loginStep === 1) {
             res = await authFetch(`/auth/request_code`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: loginData.phone, api_id: parseInt(config.api_id), api_hash: config.api_hash }) });
-            data = await res.json();
-            if (!res.ok) throw new Error(data.detail);
+            data = await res.json(); if (!res.ok) throw new Error(data.detail);
             if (data.status === "code_sent") { setLoginData({ ...loginData, hash: data.hash }); setLoginStep(2); addLog("INFO", "Código enviado."); }
             else if (data.status === "authorized") { alert("Já autenticado!"); setShowLogin(false); addLog("SUCCESS", "Autenticado."); }
         } else if (loginStep === 2) {
@@ -418,26 +418,26 @@ export default function App() {
   const addChannel = () => { if (config.active_channels.length < 5) setConfig({ ...config, active_channels: [...config.active_channels, { num: config.active_channels.length + 1, id: "", limit: 10, caption: "" }] }); };
   const removeChannel = (idx) => { const n = config.active_channels.filter((_, i) => i !== idx); n.forEach((c, i) => c.num = i + 1); setConfig({ ...config, active_channels: n }); };
 
-  // --- RENDER ---
   if (!authToken) return <SystemLogin onLogin={handleSystemLogin} />;
-
   if (!subscription.active) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans p-6">
       <RenewModal isOpen={showRenewModal} onClose={() => setShowRenewModal(false)} authFetch={authFetch} refreshStatus={fetchUserStatus} isLocked={false} />
+      <AdminPanel isOpen={showAdminModal} onClose={() => setShowAdminModal(false)} authFetch={authFetch} />
       
       <div className="max-w-6xl mx-auto mb-6 bg-gray-800 rounded-lg p-3 flex justify-between items-center border border-gray-700 shadow-md">
         <div className="flex items-center gap-4">
             <div className="flex items-center gap-2"><Activity className="text-blue-500"/> <span className="font-bold text-lg">{APP_NAME}</span></div>
             <div className="h-6 w-px bg-gray-600 mx-2"></div>
             <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400">Assinatura:</span>
-                <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded flex items-center gap-1"><CheckSquare size={12}/> Ativa</span>
-                <span className="text-gray-500 text-xs">({subscription.daysLeft} dias)</span>
+                <span className="text-gray-400">Plano:</span>
+                <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded flex items-center gap-1"><CheckSquare size={12}/> Ativo</span>
+                <span className="text-gray-500 text-xs">({subscription.daysLeft} dias restantes)</span>
             </div>
         </div>
         <div className="flex items-center gap-4">
+            {isAdmin && <button onClick={() => setShowAdminModal(true)} className="text-xs bg-red-800 hover:bg-red-700 px-3 py-1 rounded flex gap-2 transition items-center font-medium"><Shield size={14}/> Admin</button>}
             <button onClick={() => setShowRenewModal(true)} className="text-xs bg-green-700 hover:bg-green-600 px-3 py-1 rounded flex gap-2 transition items-center font-medium shadow-md shadow-green-900/20"><CreditCard size={14}/> Renovar</button>
             <div className="h-6 w-px bg-gray-600"></div>
             <span className="text-gray-400 text-sm flex gap-2 items-center bg-gray-700/50 px-3 py-1 rounded"><User size={14}/> {currentUser}</span>
@@ -446,8 +446,6 @@ export default function App() {
       </div>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Painel Config */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold text-blue-400">Configuração do Robô</h2>
@@ -477,12 +475,10 @@ export default function App() {
                         </div>
                     </div>
                     <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config.source_channel_id} onChange={e=>setConfig({...config, source_channel_id: parseInt(e.target.value)||""})}/>
-                    
                     <div className="mb-4">
                         <label className="text-[10px] text-gray-400 block mb-1">Intervalo entre Posts (segundos)</label>
                         <input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.post_interval_seconds} onChange={e=>setConfig({...config, post_interval_seconds: parseInt(e.target.value)||60})}/>
                     </div>
-
                     <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                         {config.active_channels.map((ch, i) => (
                             <div key={i} className="bg-gray-800 p-3 rounded border border-gray-600 relative group">
@@ -497,7 +493,6 @@ export default function App() {
                     </div>
                     {config.active_channels.length < 5 && <button onClick={addChannel} className="mt-3 w-full py-2 border border-dashed border-gray-500 text-gray-400 rounded hover:bg-gray-800 text-xs flex justify-center items-center gap-1 transition"><PlusCircle size={14}/> Adicionar Canal</button>}
                 </div>
-
                 <div className="flex gap-2 pt-2">
                     <button onClick={()=>setShowLogin(true)} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2.5 rounded font-medium flex justify-center items-center gap-2 text-sm transition shadow-lg shadow-blue-900/20"><KeyRound size={16}/> Autenticar Telegram</button>
                     <input type="file" ref={fileInputRef} style={{display:'none'}} accept=".json" onChange={handleHistoryFileChange} />
@@ -507,7 +502,6 @@ export default function App() {
             </div>
         </div>
 
-        {/* Painel de Logs */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col h-[600px] sticky top-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2 text-green-400"><Terminal size={20} /> Atividades</h2>
@@ -530,7 +524,6 @@ export default function App() {
         </div>
       </div>
       
-      {/* Modal de Login Telegram */}
       {showLogin && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-gray-800 p-8 rounded-xl w-full max-w-md border border-gray-600 shadow-2xl">

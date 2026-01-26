@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save } from 'lucide-react';
+import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
+// Exemplo: https://web-production-xxxx.up.railway.app
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
 const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
-// Configuração padrão
+// Configuração padrão para resetar o formulário
 const DEFAULT_CONFIG = {
     api_id: "", api_hash: "", bot_token: "", source_channel_id: "",
     post_interval_seconds: 60,
@@ -14,7 +15,7 @@ const DEFAULT_CONFIG = {
     active_channels: [{ num: 1, id: "", limit: 10, caption: "" }]
 };
 
-// --- COMPONENTE DE LOGIN ---
+// --- COMPONENTE DE LOGIN DO SISTEMA ---
 const SystemLogin = ({ onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
@@ -25,7 +26,6 @@ const SystemLogin = ({ onLogin }) => {
     e.preventDefault();
     setError("");
 
-    // Verificação de segurança da URL
     if (API_URL.includes("seu-backend-no-railway")) {
         setError("ERRO: Você não configurou o API_URL no código (App.jsx)!");
         return;
@@ -52,7 +52,6 @@ const SystemLogin = ({ onLogin }) => {
         <h2 className="text-2xl font-bold text-blue-400 mb-6 flex items-center gap-2"><Activity /> Publicador Web</h2>
         <h3 className="text-xl text-white mb-4">{isRegister ? "Criar Conta" : "Entrar no Sistema"}</h3>
         
-        {/* Aviso visual se a URL não estiver configurada */}
         {API_URL.includes("seu-backend-no-railway") && (
             <div className="p-3 rounded mb-4 text-sm bg-yellow-900/50 text-yellow-200 border border-yellow-700">
                 ⚠️ <b>Atenção:</b> Edite o ficheiro <code>src/App.jsx</code> e coloque o link do seu Railway na constante <code>API_URL</code>.
@@ -129,6 +128,7 @@ export default function App() {
     setLoginData({ phone: "", code: "", password: "", hash: "" });
   };
 
+  // Carregar Perfil do Servidor ao Iniciar
   useEffect(() => {
     if (authToken && !API_URL.includes("seu-backend")) {
         authFetch("/profile")
@@ -146,6 +146,7 @@ export default function App() {
     }
   }, [authToken]);
 
+  // WebSocket
   useEffect(() => {
     if (!authToken || API_URL.includes("seu-backend")) return;
     const ws = new WebSocket(`${WS_URL}/${authToken}`);
@@ -164,6 +165,8 @@ export default function App() {
   useEffect(() => logEndRef.current?.scrollIntoView({ behavior: "smooth" }), [logs]);
 
   const addLog = (level, msg) => setLogs(prev => [...prev, { level, msg, time: new Date().toLocaleTimeString() }]);
+
+  // --- AÇÕES ---
 
   const handleSaveProfile = async () => {
       if (!checkUrl()) return;
@@ -198,6 +201,25 @@ export default function App() {
     if (!checkUrl()) return;
     try { await authFetch(`/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); }
   };
+
+  const handleResetHistory = async () => {
+    if (isRunning) {
+        alert("Pare o bot antes de resetar o histórico.");
+        return;
+    }
+    if (!confirm("Tem a certeza? Isso fará o bot começar a republicar do INÍCIO do canal de origem (ID 0).")) return;
+    
+    try {
+        const res = await authFetch("/reset_history", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Erro");
+        addLog("SUCCESS", data.message);
+    } catch (e) {
+        addLog("ERROR", "Erro ao resetar: " + e.message);
+    }
+  };
+
+  // --- IMPORTAÇÃO DE FICHEIROS ---
 
   const handleProfileLoadClick = () => profileInputRef.current.click();
   const handleProfileFileChange = (e) => {
@@ -256,6 +278,7 @@ export default function App() {
     event.target.value = null;
   };
 
+  // --- LOGIN TELEGRAM ---
   const handleLoginSubmit = async () => {
     if (!checkUrl()) return;
     try {
@@ -308,6 +331,7 @@ export default function App() {
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
         
+        {/* Painel de Configuração */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold text-blue-400">Configuração</h2>
@@ -360,12 +384,16 @@ export default function App() {
 
                 <div className="flex gap-2 pt-4">
                     <button onClick={()=>setShowLogin(true)} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-medium flex justify-center items-center gap-2 text-sm transition"><KeyRound size={16}/> Autenticar</button>
+                    
                     <input type="file" ref={fileInputRef} style={{display:'none'}} accept=".json" onChange={handleHistoryFileChange} />
                     <button onClick={handleImportHistoryClick} className="flex-1 bg-purple-600 hover:bg-purple-500 py-2 rounded font-medium flex justify-center items-center gap-2 text-sm transition"><Upload size={16}/> Histórico</button>
+
+                    <button onClick={handleResetHistory} className="flex-1 bg-red-900/50 hover:bg-red-800 py-2 rounded font-medium flex justify-center items-center gap-2 text-sm transition border border-red-800" title="Reiniciar do ID 0"><RotateCcw size={16}/> Resetar</button>
                 </div>
             </div>
         </div>
 
+        {/* Painel de Logs */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col h-[600px] sticky top-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2 text-green-400"><Terminal size={20} /> Consola</h2>

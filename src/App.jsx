@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
+// ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
-const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app";
+const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
-// Configuração padrão para resetar o formulário
+// Configuração padrão
 const DEFAULT_CONFIG = {
     api_id: "", api_hash: "", bot_token: "", source_channel_id: "",
     post_interval_seconds: 60,
@@ -23,6 +24,13 @@ const SystemLogin = ({ onLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Verificação de segurança da URL
+    if (API_URL.includes("seu-backend-no-railway")) {
+        setError("ERRO: Você não configurou o API_URL no código (App.jsx)!");
+        return;
+    }
+
     const endpoint = isRegister ? "/register" : "/token";
     const body = isRegister 
       ? JSON.stringify({ username, password })
@@ -32,10 +40,10 @@ const SystemLogin = ({ onLogin }) => {
     try {
       const res = await fetch(`${API_URL}${endpoint}`, { method: "POST", headers, body });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Erro");
+      if (!res.ok) throw new Error(data.detail || "Erro de conexão");
       if (isRegister) { setIsRegister(false); setError("Conta criada! Faça login."); }
       else onLogin(data.access_token, data.username);
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError("Falha ao conectar: " + err.message); }
   };
 
   return (
@@ -43,13 +51,21 @@ const SystemLogin = ({ onLogin }) => {
       <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700">
         <h2 className="text-2xl font-bold text-blue-400 mb-6 flex items-center gap-2"><Activity /> Publicador Web</h2>
         <h3 className="text-xl text-white mb-4">{isRegister ? "Criar Conta" : "Entrar no Sistema"}</h3>
+        
+        {/* Aviso visual se a URL não estiver configurada */}
+        {API_URL.includes("seu-backend-no-railway") && (
+            <div className="p-3 rounded mb-4 text-sm bg-yellow-900/50 text-yellow-200 border border-yellow-700">
+                ⚠️ <b>Atenção:</b> Edite o ficheiro <code>src/App.jsx</code> e coloque o link do seu Railway na constante <code>API_URL</code>.
+            </div>
+        )}
+
         {error && <div className="p-3 rounded mb-4 text-sm bg-red-900/50 text-red-300">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input className="w-full bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Utilizador" value={username} onChange={e => setUsername(e.target.value)} required />
           <input type="password" className="w-full bg-gray-700 p-3 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} required />
           <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded font-bold transition">{isRegister ? "Registar" : "Entrar"}</button>
         </form>
-        <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="w-full mt-4 text-sm text-gray-400 hover:text-white">{isRegister ? "Já tem conta? Login" : "Criar conta"}</button>
+        <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="w-full mt-4 text-sm text-gray-400 hover:text-white transition">{isRegister ? "Já tem conta? Login" : "Criar conta"}</button>
       </div>
     </div>
   );
@@ -63,7 +79,6 @@ export default function App() {
   const [status, setStatus] = useState("Ocioso");
   const [isRunning, setIsRunning] = useState(false);
   
-  // Inicializa com configuração vazia
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   
   const [showLogin, setShowLogin] = useState(false);
@@ -73,6 +88,14 @@ export default function App() {
   const logEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const profileInputRef = useRef(null);
+
+  const checkUrl = () => {
+    if (API_URL.includes("seu-backend-no-railway")) {
+      alert("ERRO DE CONFIGURAÇÃO:\n\nAbra o ficheiro 'src/App.jsx' e substitua o link 'https://seu-backend-no-railway.app' pelo link real do seu Railway.");
+      return false;
+    }
+    return true;
+  };
 
   const authFetch = async (endpoint, options = {}) => {
     const headers = { ...options.headers, "Authorization": `Bearer ${authToken}` };
@@ -91,7 +114,6 @@ export default function App() {
     setCurrentUser(username);
     localStorage.setItem("authToken", token);
     localStorage.setItem("currentUser", username);
-    // IMPORTANTE: Ao logar, reseta o config visualmente antes de tentar carregar o novo
     setConfig(DEFAULT_CONFIG);
     setLogs([]);
   };
@@ -101,21 +123,17 @@ export default function App() {
     setCurrentUser(null);
     localStorage.removeItem("authToken");
     localStorage.removeItem("currentUser");
-    // IMPORTANTE: Limpa todos os dados sensíveis da tela ao sair
     setLogs([]);
     setStatus("Ocioso");
     setConfig(DEFAULT_CONFIG); 
     setLoginData({ phone: "", code: "", password: "", hash: "" });
   };
 
-  // Carregar Perfil do Servidor ao Iniciar
   useEffect(() => {
     if (authToken && !API_URL.includes("seu-backend")) {
         authFetch("/profile")
             .then(res => res.json())
             .then(data => {
-                // Se o backend retornar dados válidos, carrega.
-                // Se retornar vazio (novo user), garante que o form fica limpo.
                 if (data.api_id || (data.active_channels && data.active_channels.length > 0)) {
                     setConfig(prev => ({...prev, ...data}));
                     addLog("SUCCESS", "Perfil carregado do servidor.");
@@ -148,6 +166,7 @@ export default function App() {
   const addLog = (level, msg) => setLogs(prev => [...prev, { level, msg, time: new Date().toLocaleTimeString() }]);
 
   const handleSaveProfile = async () => {
+      if (!checkUrl()) return;
       try {
           const payload = { ...config, active_channels: config.active_channels.map(ch => ({ ...ch, id: parseInt(ch.id)||0, limit: parseInt(ch.limit)||0 })) };
           await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -156,6 +175,7 @@ export default function App() {
   };
 
   const handleStart = async () => {
+    if (!checkUrl()) return;
     try {
       setIsRunning(true);
       const payload = {
@@ -175,6 +195,7 @@ export default function App() {
   };
 
   const handleStop = async () => {
+    if (!checkUrl()) return;
     try { await authFetch(`/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); }
   };
 
@@ -220,6 +241,7 @@ export default function App() {
 
   const handleImportHistoryClick = () => fileInputRef.current.click();
   const handleHistoryFileChange = async (event) => {
+    if (!checkUrl()) return;
     const file = event.target.files[0];
     if (!file) return;
     const formData = new FormData();
@@ -235,6 +257,7 @@ export default function App() {
   };
 
   const handleLoginSubmit = async () => {
+    if (!checkUrl()) return;
     try {
         let res, data;
         if (loginStep === 1) {

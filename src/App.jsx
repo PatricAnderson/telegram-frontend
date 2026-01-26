@@ -3,6 +3,7 @@ import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2,
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
+// Exemplo: https://web-production-xxxx.up.railway.app
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
 const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
@@ -21,38 +22,47 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     const [key, setKey] = useState("");
     const [pixData, setPixData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [planId, setPlanId] = useState(null);
 
     // Limpa estado ao fechar/abrir
-    useEffect(() => { if(isOpen) { setMode("select"); setPixData(null); setKey(""); } }, [isOpen]);
+    useEffect(() => { if(isOpen) { setMode("select"); setPixData(null); setKey(""); setPlanId(null); } }, [isOpen]);
+
+    // Polling para verificar pagamento Pix
+    useEffect(() => {
+        let interval;
+        if (isOpen && mode === "pix" && pixData && planId) {
+            interval = setInterval(async () => {
+                try {
+                    const check = await authFetch(`/payment/check/${pixData.id}?plan_id=${planId}`);
+                    const status = await check.json();
+                    
+                    if (status.status === "approved") {
+                        clearInterval(interval);
+                        alert("✅ Pagamento Aprovado! A sua assinatura foi renovada.");
+                        refreshStatus();
+                        onClose();
+                    }
+                } catch(e) { console.error("Erro ao verificar pagamento", e); }
+            }, 5000);
+        }
+        return () => clearInterval(interval);
+    }, [isOpen, mode, pixData, planId]);
 
     if (!isOpen) return null;
 
-    const handleCreatePix = async (planId) => {
+    const handleCreatePix = async (pid) => {
         setLoading(true);
+        setPlanId(pid);
         try {
             const res = await authFetch("/payment/create_pix", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ plan_id: planId })
+                body: JSON.stringify({ plan_id: pid })
             });
             const data = await res.json();
             if (res.ok) {
                 setPixData(data);
                 setMode("pix");
-                // Polling para verificar pagamento
-                const interval = setInterval(async () => {
-                    if (!isOpen) clearInterval(interval);
-                    try {
-                        const check = await authFetch(`/payment/check/${data.id}?plan_id=${planId}`);
-                        const status = await check.json();
-                        if (status.status === "approved") {
-                            clearInterval(interval);
-                            alert("✅ Pagamento Aprovado! Dias adicionados com sucesso.");
-                            refreshStatus();
-                            onClose();
-                        }
-                    } catch(e) {}
-                }, 5000);
             } else alert("Erro: " + data.detail);
         } catch (e) { alert("Erro de conexão: " + e.message); }
         setLoading(false);
@@ -87,12 +97,12 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
                 {mode === "select" && (
                     <div className="space-y-3">
                         <button onClick={() => handleCreatePix("mensal")} className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 p-4 rounded-lg text-left flex justify-between items-center transition shadow-lg border border-blue-500/30">
-                            <span className="font-medium">Mensal (30 Dias)</span>
-                            <span className="font-bold bg-blue-900/50 px-2 py-1 rounded">R$ 29,90</span>
+                            <span className="font-medium text-white">Mensal (30 Dias)</span>
+                            <span className="font-bold bg-blue-900/50 px-2 py-1 rounded text-white">R$ 29,90</span>
                         </button>
                         <button onClick={() => handleCreatePix("trimestral")} className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 p-4 rounded-lg text-left flex justify-between items-center transition shadow-lg border border-purple-500/30">
-                            <span className="font-medium">Trimestral (90 Dias)</span>
-                            <span className="font-bold bg-purple-900/50 px-2 py-1 rounded">R$ 79,90</span>
+                            <span className="font-medium text-white">Trimestral (90 Dias)</span>
+                            <span className="font-bold bg-purple-900/50 px-2 py-1 rounded text-white">R$ 79,90</span>
                         </button>
                         
                         <div className="relative my-6">
@@ -110,7 +120,6 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
                     <div className="text-center">
                         <p className="text-yellow-400 font-bold mb-4 text-lg">Pagamento Pendente</p>
                         <div className="bg-white p-2 rounded inline-block mb-4 shadow-inner">
-                           {/* Aqui seria ideal usar uma lib QR Code React, mas para simplicidade usamos uma div */}
                            <div className="w-48 h-48 flex items-center justify-center bg-gray-100 text-black text-xs p-4 break-words overflow-hidden relative">
                                 {pixData.qr_code_base64 ? 
                                     <img src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} alt="QR Code" className="w-full h-full object-contain" /> :
@@ -120,15 +129,8 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
                         </div>
                         <p className="text-sm text-gray-400 mb-2 font-medium">Valor: <span className="text-white">R$ {pixData.amount.toFixed(2)}</span></p>
                         
-                        <div className="relative mb-4">
-                            <input readOnly value={pixData.qr_code} className="w-full bg-gray-900 p-3 rounded text-xs text-gray-300 font-mono border border-gray-700 pr-10" />
-                            <button onClick={() => {navigator.clipboard.writeText(pixData.qr_code); alert("Código Copiado!");}} className="absolute right-2 top-2 text-gray-400 hover:text-white" title="Copiar">
-                                <Copy size={16}/>
-                            </button>
-                        </div>
-                        
                         <div className="flex flex-col gap-2">
-                            <button onClick={() => {navigator.clipboard.writeText(pixData.qr_code); alert("Copiado!");}} className="w-full bg-green-600 hover:bg-green-500 py-2 rounded flex items-center justify-center gap-2 font-bold transition">
+                            <button onClick={() => {navigator.clipboard.writeText(pixData.qr_code); alert("Copiado!");}} className="w-full bg-green-600 hover:bg-green-500 py-2 rounded flex items-center justify-center gap-2 font-bold transition text-white">
                                 <Copy size={16}/> Copiar Código Pix
                             </button>
                             <button onClick={() => setMode("select")} className="text-xs text-gray-500 hover:text-gray-300 mt-2">Cancelar / Voltar</button>
@@ -141,7 +143,7 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
                     <form onSubmit={handleKeyRedeem}>
                         <label className="text-xs text-gray-400 block mb-2 text-left">Chave de 30 ou 90 dias</label>
                         <input className="w-full bg-gray-700 p-3 rounded text-white mb-4 text-center font-mono uppercase tracking-widest border border-gray-600 focus:border-green-500 focus:outline-none" placeholder="XXXX-XXXX-XXXX" value={key} onChange={e => setKey(e.target.value)} required />
-                        <button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded font-bold transition">{loading ? "A Validar..." : "Ativar Chave"}</button>
+                        <button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded font-bold text-white transition">{loading ? "A Validar..." : "Ativar Chave"}</button>
                         <button type="button" onClick={() => setMode("select")} className="w-full mt-3 text-xs text-gray-400 hover:text-white">Voltar</button>
                     </form>
                 )}
@@ -169,12 +171,12 @@ const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
           Entrar com outra conta
         </button>
       </div>
-      <p className="text-xs text-gray-600 mt-6">Precisa de ajuda? Contacte o suporte no Telegram.</p>
+      <p className="text-xs text-gray-600 mt-6">Precisa de ajuda? Contacte o suporte.</p>
     </div>
   </div>
 );
 
-// --- COMPONENTE DE LOGIN ---
+// --- COMPONENTE DE LOGIN DO SISTEMA ---
 const SystemLogin = ({ onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
@@ -186,7 +188,7 @@ const SystemLogin = ({ onLogin }) => {
     setError("");
 
     if (API_URL.includes("seu-backend-no-railway")) {
-        setError("ERRO CRÍTICO: API_URL não configurada no App.jsx!");
+        setError("ERRO CRÍTICO: Configure o API_URL no App.jsx!");
         return;
     }
 
@@ -208,7 +210,6 @@ const SystemLogin = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4 font-sans text-gray-100">
       <div className="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700 relative overflow-hidden">
-        {/* Background Accent */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
         
         <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
@@ -240,7 +241,7 @@ const SystemLogin = ({ onLogin }) => {
         
         <div className="mt-6 pt-6 border-t border-gray-700 text-center">
             <button onClick={() => {setIsRegister(!isRegister); setError("");}} className="text-sm text-gray-400 hover:text-white transition">
-            {isRegister ? "Já tem uma conta? Entrar" : "Ainda não tem conta? Criar agora"}
+            {isRegister ? "Já tem conta? Entrar" : "Ainda não tem conta? Criar agora"}
             </button>
         </div>
       </div>
@@ -281,19 +282,14 @@ export default function App() {
   };
 
   const handleSystemLogin = (token, username) => {
-    setAuthToken(token);
-    setCurrentUser(username);
-    localStorage.setItem("authToken", token);
-    localStorage.setItem("currentUser", username);
+    setAuthToken(token); setCurrentUser(username);
+    localStorage.setItem("authToken", token); localStorage.setItem("currentUser", username);
   };
 
   const handleLogout = () => {
-    setAuthToken(null);
-    setCurrentUser(null);
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("currentUser");
-    setLogs([]);
-    setConfig(DEFAULT_CONFIG);
+    setAuthToken(null); setCurrentUser(null);
+    localStorage.removeItem("authToken"); localStorage.removeItem("currentUser");
+    setLogs([]); setConfig(DEFAULT_CONFIG);
   };
 
   const fetchUserStatus = async () => {
@@ -339,7 +335,7 @@ export default function App() {
   };
 
   const handleStart = async () => {
-      if (!subscription.active) { alert("Renove sua assinatura!"); return; }
+      if (!subscription.active) { alert("Assinatura expirada!"); return; }
       try {
           setIsRunning(true);
           const payload = { ...config, active_channels: config.active_channels.map(ch => ({ ...ch, id: parseInt(ch.id)||0, limit: parseInt(ch.limit)||0 })) };
@@ -362,8 +358,7 @@ export default function App() {
   // --- Importações de Arquivo ---
   const handleProfileLoadClick = () => profileInputRef.current.click();
   const handleProfileFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
         try {
@@ -371,40 +366,21 @@ export default function App() {
             const newChannels = [];
             for (let i = 1; i <= 5; i++) {
                 if (data[`enable_channel_${i}`] === true) {
-                    newChannels.push({
-                        num: i,
-                        id: parseInt(data[`destination_channel_id_${i}`]) || "",
-                        limit: parseInt(data[`daily_limit_channel_${i}`]) || 10,
-                        caption: data[`custom_caption_${i}`] || ""
-                    });
+                    newChannels.push({ num: i, id: parseInt(data[`destination_channel_id_${i}`]) || "", limit: parseInt(data[`daily_limit_channel_${i}`]) || 10, caption: data[`custom_caption_${i}`] || "" });
                 }
             }
             if (newChannels.length === 0) newChannels.push({ num: 1, id: "", limit: 10, caption: "" });
-            setConfig(prev => ({
-                ...prev,
-                api_id: parseInt(data.api_id) || prev.api_id,
-                api_hash: data.api_hash || prev.api_hash,
-                bot_token: data.bot_token || prev.bot_token,
-                source_channel_id: parseInt(data.source_channel_id) || prev.source_channel_id,
-                post_interval_seconds: parseInt(data.post_interval_seconds) || 60,
-                filter_photos: data.filter_photos !== false,
-                filter_videos: data.filter_videos !== false,
-                filter_gifs: data.filter_gifs !== false,
-                active_channels: newChannels
-            }));
-            addLog("SUCCESS", "Perfil local importado!");
+            setConfig(prev => ({ ...prev, api_id: parseInt(data.api_id) || prev.api_id, api_hash: data.api_hash || prev.api_hash, bot_token: data.bot_token || prev.bot_token, source_channel_id: parseInt(data.source_channel_id) || prev.source_channel_id, post_interval_seconds: parseInt(data.post_interval_seconds) || 60, filter_photos: data.filter_photos !== false, filter_videos: data.filter_videos !== false, filter_gifs: data.filter_gifs !== false, active_channels: newChannels }));
+            addLog("SUCCESS", "Perfil importado!");
         } catch(err) { addLog("ERROR", "Erro no JSON."); }
     };
-    reader.readAsText(file);
-    e.target.value = null;
+    reader.readAsText(file); e.target.value = null;
   };
-
+  
   const handleImportHistoryClick = () => fileInputRef.current.click();
   const handleHistoryFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
+    const file = event.target.files[0]; if (!file) return;
+    const formData = new FormData(); formData.append("file", file);
     try {
       addLog("INFO", "A enviar histórico...");
       const res = await authFetch(`/upload_history`, { method: "POST", body: formData });
@@ -427,14 +403,12 @@ export default function App() {
             else if (data.status === "authorized") { alert("Já autenticado!"); setShowLogin(false); addLog("SUCCESS", "Autenticado."); }
         } else if (loginStep === 2) {
             res = await authFetch(`/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: loginData.phone, code: loginData.code, phone_code_hash: loginData.hash }) });
-            data = await res.json();
-            if (!res.ok) throw new Error(data.detail);
+            data = await res.json(); if (!res.ok) throw new Error(data.detail);
             if (data.status === "success") { setShowLogin(false); addLog("SUCCESS", "Login Sucesso!"); }
             else if (data.status === "2fa_required") setLoginStep(3);
         } else if (loginStep === 3) {
             res = await authFetch(`/auth/2fa`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: loginData.password }) });
-            data = await res.json();
-            if (!res.ok) throw new Error(data.detail);
+            data = await res.json(); if (!res.ok) throw new Error(data.detail);
             if (data.status === "success") { setShowLogin(false); addLog("SUCCESS", "Login 2FA Sucesso!"); }
         }
     } catch (e) { alert(e.message); addLog("ERROR", e.message); }
@@ -458,9 +432,9 @@ export default function App() {
             <div className="flex items-center gap-2"><Activity className="text-blue-500"/> <span className="font-bold text-lg">{APP_NAME}</span></div>
             <div className="h-6 w-px bg-gray-600 mx-2"></div>
             <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400">Plano:</span>
-                <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded flex items-center gap-1"><CheckSquare size={12}/> Ativo</span>
-                <span className="text-gray-500 text-xs">({subscription.daysLeft} dias restantes)</span>
+                <span className="text-gray-400">Assinatura:</span>
+                <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded flex items-center gap-1"><CheckSquare size={12}/> Ativa</span>
+                <span className="text-gray-500 text-xs">({subscription.daysLeft} dias)</span>
             </div>
         </div>
         <div className="flex items-center gap-4">
@@ -538,7 +512,7 @@ export default function App() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2 text-green-400"><Terminal size={20} /> Atividades</h2>
             <div className="flex items-center gap-2">
-                {API_URL.includes("seu-backend") && <AlertTriangle className="text-yellow-500 animate-pulse" size={20}/>}
+                {API_URL.includes("seu-backend") && <AlertTriangle className="text-yellow-500" size={20}/>}
                 <span className={`text-xs px-2 py-1 rounded border ${status === "Ocioso" ? "bg-gray-700 text-gray-400 border-gray-600" : "bg-green-900/30 text-green-400 border-green-800"}`}>Status: {status}</span>
             </div>
           </div>
@@ -561,35 +535,12 @@ export default function App() {
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-gray-800 p-8 rounded-xl w-full max-w-md border border-gray-600 shadow-2xl">
             <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2"><KeyRound className="text-blue-500"/> Autenticação Telegram</h3>
-            
-            {loginStep === 1 && (
-                <div className="animate-fade-in">
-                    <label className="text-xs text-gray-400 mb-1 block">Número de Telemóvel</label>
-                    <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg text-white mb-4 focus:border-blue-500 focus:outline-none" placeholder="+351..." value={loginData.phone} onChange={e=>setLoginData({...loginData, phone:e.target.value})}/>
-                    <p className="text-xs text-gray-500 mb-4">Insira o número com o código do país.</p>
-                </div>
-            )}
-            
-            {loginStep === 2 && (
-                <div className="animate-fade-in">
-                    <label className="text-xs text-gray-400 mb-1 block">Código de Confirmação</label>
-                    <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg text-white mb-4 focus:border-blue-500 focus:outline-none text-center tracking-widest text-lg" placeholder="1 2 3 4 5" value={loginData.code} onChange={e=>setLoginData({...loginData, code:e.target.value})}/>
-                    <p className="text-xs text-gray-500 mb-4">Verifique a mensagem enviada pelo Telegram oficial.</p>
-                </div>
-            )}
-            
-            {loginStep === 3 && (
-                <div className="animate-fade-in">
-                    <label className="text-xs text-gray-400 mb-1 block">Senha de 2 Passos (2FA)</label>
-                    <input type="password" className="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg text-white mb-4 focus:border-blue-500 focus:outline-none" placeholder="Sua senha..." value={loginData.password} onChange={e=>setLoginData({...loginData, password:e.target.value})}/>
-                </div>
-            )}
-
+            {loginStep === 1 && <input className="w-full bg-gray-700 p-2 rounded mb-4 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="+351..." value={loginData.phone} onChange={e=>setLoginData({...loginData, phone:e.target.value})}/>}
+            {loginStep === 2 && <input className="w-full bg-gray-700 p-2 rounded mb-4 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Código (ex: 12345)" value={loginData.code} onChange={e=>setLoginData({...loginData, code:e.target.value})}/>}
+            {loginStep === 3 && <input type="password" className="w-full bg-gray-700 p-2 rounded mb-4 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Senha 2FA (Se houver)" value={loginData.password} onChange={e=>setLoginData({...loginData, password:e.target.value})}/>}
             <div className="flex justify-end gap-3 mt-4">
                 <button onClick={()=>setShowLogin(false)} className="px-4 py-2 text-gray-400 hover:text-white transition">Cancelar</button>
-                <button onClick={handleLoginSubmit} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-medium transition shadow-lg shadow-blue-900/20">
-                    {loginStep===1 ? "Enviar Código" : "Confirmar"}
-                </button>
+                <button onClick={handleLoginSubmit} className="bg-blue-600 px-6 py-2 rounded-lg font-medium hover:bg-blue-500 transition shadow-lg shadow-blue-900/20">{loginStep===1 ? "Enviar Código" : "Confirmar"}</button>
             </div>
           </div>
         </div>

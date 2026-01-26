@@ -181,15 +181,13 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
             <div className="bg-gray-800 p-6 rounded-xl w-full max-w-md border border-gray-600 shadow-2xl relative">
                 {!isLocked && <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button>}
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white"><CreditCard className="text-green-500"/> Renovar Assinatura</h3>
-                
                 {mode === "select" && (
                     <div className="space-y-3">
                         <button onClick={() => handleCreatePix("mensal")} className="w-full bg-blue-700 hover:bg-blue-600 p-4 rounded-lg flex justify-between items-center transition shadow-lg"><span className="font-medium text-white">Mensal (30 Dias)</span><span className="font-bold bg-blue-900/50 px-2 py-1 rounded text-white">R$ 29,90</span></button>
                         <button onClick={() => handleCreatePix("trimestral")} className="w-full bg-purple-700 hover:bg-purple-600 p-4 rounded-lg flex justify-between items-center transition shadow-lg"><span className="font-medium text-white">Trimestral (90 Dias)</span><span className="font-bold bg-purple-900/50 px-2 py-1 rounded text-white">R$ 79,90</span></button>
-                        <div className="border-t border-gray-600 my-4 pt-4"><button onClick={() => setMode("key")} className="w-full bg-gray-700 p-3 rounded text-sm text-gray-300 flex justify-center gap-2 hover:text-white transition"><KeyRound size={16}/> Tenho uma Chave</button></div>
+                        <div className="border-t border-gray-600 my-4 pt-4"><button onClick={() => setMode("key")} className="w-full bg-gray-700 p-3 rounded text-sm text-gray-300 flex justify-center gap-2 hover:text-white"><KeyRound size={16}/> Tenho uma Chave</button></div>
                     </div>
                 )}
-                
                 {mode === "pix" && pixData && (
                     <div className="text-center animate-fade-in">
                         <p className="text-yellow-400 font-bold mb-4">Pagamento Pendente</p>
@@ -200,7 +198,6 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
                         <p className="text-xs text-blue-400 mt-4 animate-pulse flex justify-center gap-1"><RefreshCw size={12} className="animate-spin"/> Aguardando confirmação...</p>
                     </div>
                 )}
-                
                 {mode === "key" && (
                     <form onSubmit={handleKeyRedeem} className="animate-fade-in">
                         <input className="w-full bg-gray-700 p-3 rounded text-white mb-4 text-center font-mono uppercase border border-gray-600 focus:border-green-500 outline-none tracking-widest" placeholder="XXXX-XXXX-XXXX" value={key} onChange={e => setKey(e.target.value)} required />
@@ -273,7 +270,9 @@ const SystemLogin = ({ onLogin }) => {
 export default function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem("authToken"));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("currentUser"));
-  const [subscription, setSubscription] = useState({ active: true, daysLeft: 0 });
+  
+  // --- CORREÇÃO: days_left no estado inicial para consistência ---
+  const [subscription, setSubscription] = useState({ active: true, days_left: 0 });
   const [isAdmin, setIsAdmin] = useState(false);
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -357,7 +356,6 @@ export default function App() {
   };
   const handleStop = async () => { try { await authFetch(`/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); } };
   const handleResetHistory = async () => { if(isRunning) { alert("Pare o bot!"); return; } if(!confirm("Resetar?")) return; try { await authFetch("/reset_history", { method: "POST" }); addLog("SUCCESS", "Resetado!"); } catch(e) {} };
-  
   const handleProfileLoadClick = () => profileInputRef.current.click();
   const handleProfileFileChange = (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -433,7 +431,8 @@ export default function App() {
             <div className="flex items-center gap-2 text-sm">
                 <span className="text-gray-400">Plano:</span>
                 <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded flex items-center gap-1"><CheckSquare size={12}/> Ativo</span>
-                <span className="text-gray-500 text-xs">({subscription.daysLeft} dias restantes)</span>
+                {/* --- CORREÇÃO: Usar days_left --- */}
+                <span className="text-gray-500 text-xs">({subscription.days_left} dias restantes)</span>
             </div>
         </div>
         <div className="flex items-center gap-4">

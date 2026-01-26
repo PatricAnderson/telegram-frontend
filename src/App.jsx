@@ -210,12 +210,13 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     );
 };
 
+// --- COMPONENTE DE BLOQUEIO (MODIFICADO PARA RIGOR) ---
 const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   <div className="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center p-4 bg-opacity-95 backdrop-blur-sm">
     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center border border-red-900/50">
       <Lock size={48} className="text-red-500 mx-auto mb-4" />
       <h2 className="text-2xl font-bold text-white mb-2">Acesso Expirado</h2>
-      <p className="text-gray-400 mb-8">Sua assinatura terminou. Renove para continuar.</p>
+      <p className="text-gray-400 mb-8">O seu tempo acabou (0 dias restantes).<br/>Renove para continuar a usar o bot.</p>
       <div className="space-y-3">
         <button onClick={onOpenRenew} className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold flex justify-center gap-2"><CreditCard size={18}/> Renovar Agora</button>
         <button onClick={onLogout} className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-3 rounded font-medium">Sair</button>
@@ -224,6 +225,7 @@ const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   </div>
 );
 
+// --- COMPONENTE DE LOGIN (Igual) ---
 const SystemLogin = ({ onLogin }) => {
     const [isRegister, setIsRegister] = useState(false);
     const [username, setUsername] = useState("");
@@ -271,8 +273,10 @@ export default function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem("authToken"));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("currentUser"));
   
-  // --- CORREÇÃO: days_left no estado inicial para consistência ---
-  const [subscription, setSubscription] = useState({ active: true, days_left: 0 });
+  // --- INICIALIZAÇÃO SEGURA DA ASSINATURA ---
+  const [subscription, setSubscription] = useState({ active: false, days_left: 0 });
+  const [isStatusLoaded, setIsStatusLoaded] = useState(false); // Flag de carregamento
+
   const [isAdmin, setIsAdmin] = useState(false);
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -310,6 +314,7 @@ export default function App() {
     setAuthToken(null); setCurrentUser(null);
     localStorage.removeItem("authToken"); localStorage.removeItem("currentUser");
     setLogs([]); setConfig(DEFAULT_CONFIG);
+    setIsStatusLoaded(false); // Reset status flag
   };
 
   const fetchUserStatus = async () => {
@@ -322,6 +327,7 @@ export default function App() {
               setIsAdmin(data.username === "admin");
           }
       } catch (e) { console.error("Erro status:", e); }
+      finally { setIsStatusLoaded(true); } // Marca como carregado
   };
 
   useEffect(() => {
@@ -345,8 +351,10 @@ export default function App() {
   const addLog = (level, msg) => setLogs(prev => [...prev, { level, msg, time: new Date().toLocaleTimeString() }]);
 
   const handleSaveProfile = async () => { try { await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }); addLog("SUCCESS", "Perfil salvo!"); } catch(e) { addLog("ERROR", "Erro ao salvar."); } };
+  
   const handleStart = async () => {
-      if (!subscription.active) { alert("Assinatura expirada!"); return; }
+      // Bloqueio redundante no botão iniciar
+      if (!subscription.active || subscription.days_left <= 0) { alert("Assinatura expirada!"); return; }
       try {
           setIsRunning(true);
           const payload = { ...config, active_channels: config.active_channels.map(ch => ({ ...ch, id: parseInt(ch.id)||0, limit: parseInt(ch.limit)||0 })) };
@@ -354,6 +362,7 @@ export default function App() {
           if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
       } catch (e) { addLog("ERROR", e.message); setIsRunning(false); }
   };
+
   const handleStop = async () => { try { await authFetch(`/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); } };
   const handleResetHistory = async () => { if(isRunning) { alert("Pare o bot!"); return; } if(!confirm("Resetar?")) return; try { await authFetch("/reset_history", { method: "POST" }); addLog("SUCCESS", "Resetado!"); } catch(e) {} };
   const handleProfileLoadClick = () => profileInputRef.current.click();
@@ -416,8 +425,20 @@ export default function App() {
   const addChannel = () => { if (config.active_channels.length < 5) setConfig({ ...config, active_channels: [...config.active_channels, { num: config.active_channels.length + 1, id: "", limit: 10, caption: "" }] }); };
   const removeChannel = (idx) => { const n = config.active_channels.filter((_, i) => i !== idx); n.forEach((c, i) => c.num = i + 1); setConfig({ ...config, active_channels: n }); };
 
+  // --- RENDERIZAÇÃO PRINCIPAL ---
   if (!authToken) return <SystemLogin onLogin={handleSystemLogin} />;
-  if (!subscription.active) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
+
+  // Ecrã de Loading enquanto verifica o status
+  if (!isStatusLoaded) return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-4">
+          <Activity className="text-blue-500 animate-spin" size={48}/>
+          <span className="text-gray-400 animate-pulse">A carregar o seu perfil...</span>
+      </div>
+  );
+
+  // Ecrã de Bloqueio (Rigoroso: 0 dias = bloqueio)
+  const isExpired = !subscription.active || subscription.days_left <= 0;
+  if (isExpired) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans p-6">
@@ -431,7 +452,6 @@ export default function App() {
             <div className="flex items-center gap-2 text-sm">
                 <span className="text-gray-400">Plano:</span>
                 <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded flex items-center gap-1"><CheckSquare size={12}/> Ativo</span>
-                {/* --- CORREÇÃO: Usar days_left --- */}
                 <span className="text-gray-500 text-xs">({subscription.days_left} dias restantes)</span>
             </div>
         </div>
@@ -445,6 +465,8 @@ export default function App() {
       </div>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* Painel Config */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold text-blue-400">Configuração do Robô</h2>
@@ -474,10 +496,12 @@ export default function App() {
                         </div>
                     </div>
                     <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config.source_channel_id} onChange={e=>setConfig({...config, source_channel_id: parseInt(e.target.value)||""})}/>
+                    
                     <div className="mb-4">
                         <label className="text-[10px] text-gray-400 block mb-1">Intervalo entre Posts (segundos)</label>
                         <input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.post_interval_seconds} onChange={e=>setConfig({...config, post_interval_seconds: parseInt(e.target.value)||60})}/>
                     </div>
+
                     <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                         {config.active_channels.map((ch, i) => (
                             <div key={i} className="bg-gray-800 p-3 rounded border border-gray-600 relative group">
@@ -492,6 +516,7 @@ export default function App() {
                     </div>
                     {config.active_channels.length < 5 && <button onClick={addChannel} className="mt-3 w-full py-2 border border-dashed border-gray-500 text-gray-400 rounded hover:bg-gray-800 text-xs flex justify-center items-center gap-1 transition"><PlusCircle size={14}/> Adicionar Canal</button>}
                 </div>
+
                 <div className="flex gap-2 pt-2">
                     <button onClick={()=>setShowLogin(true)} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2.5 rounded font-medium flex justify-center items-center gap-2 text-sm transition shadow-lg shadow-blue-900/20"><KeyRound size={16}/> Autenticar Telegram</button>
                     <input type="file" ref={fileInputRef} style={{display:'none'}} accept=".json" onChange={handleHistoryFileChange} />
@@ -523,6 +548,7 @@ export default function App() {
         </div>
       </div>
       
+      {/* Modal de Login Telegram */}
       {showLogin && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-gray-800 p-8 rounded-xl w-full max-w-md border border-gray-600 shadow-2xl">

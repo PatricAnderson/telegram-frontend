@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield } from 'lucide-react';
+import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield, Calendar, Clock } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
-// ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
 const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
@@ -12,10 +11,14 @@ const DEFAULT_CONFIG = {
     api_id: "", api_hash: "", bot_token: "", source_channel_id: "",
     post_interval_seconds: 60,
     filter_photos: true, filter_videos: true, filter_gifs: true,
+    // Novos campos de agendamento
+    schedule_enabled: false,
+    schedule_time: "09:00",
+    schedule_daily: true,
     active_channels: [{ num: 1, id: "", limit: 10, caption: "" }]
 };
 
-// --- COMPONENTE: MODAL DE ADMINISTRAÇÃO ---
+// --- COMPONENTE: MODAL DE ADMINISTRAÇÃO (Mantido igual) ---
 const AdminPanel = ({ isOpen, onClose, authFetch }) => {
     const [tab, setTab] = useState("users");
     const [users, setUsers] = useState([]);
@@ -123,7 +126,7 @@ const AdminPanel = ({ isOpen, onClose, authFetch }) => {
     );
 };
 
-// --- COMPONENTE: MODAL DE RENOVAÇÃO ---
+// --- COMPONENTE: MODAL DE RENOVAÇÃO (Mantido igual) ---
 const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => {
     const [mode, setMode] = useState("select");
     const [key, setKey] = useState("");
@@ -210,7 +213,7 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     );
 };
 
-// --- COMPONENTE DE BLOQUEIO (MODIFICADO PARA RIGOR) ---
+// --- COMPONENTE DE BLOQUEIO (Mantido igual) ---
 const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   <div className="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center p-4 bg-opacity-95 backdrop-blur-sm">
     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center border border-red-900/50">
@@ -225,7 +228,7 @@ const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   </div>
 );
 
-// --- COMPONENTE DE LOGIN (Igual) ---
+// --- COMPONENTE DE LOGIN (Mantido igual) ---
 const SystemLogin = ({ onLogin }) => {
     const [isRegister, setIsRegister] = useState(false);
     const [username, setUsername] = useState("");
@@ -272,11 +275,8 @@ const SystemLogin = ({ onLogin }) => {
 export default function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem("authToken"));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("currentUser"));
-  
-  // --- INICIALIZAÇÃO SEGURA DA ASSINATURA ---
   const [subscription, setSubscription] = useState({ active: false, days_left: 0 });
-  const [isStatusLoaded, setIsStatusLoaded] = useState(false); // Flag de carregamento
-
+  const [isStatusLoaded, setIsStatusLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -313,8 +313,7 @@ export default function App() {
   const handleLogout = () => {
     setAuthToken(null); setCurrentUser(null);
     localStorage.removeItem("authToken"); localStorage.removeItem("currentUser");
-    setLogs([]); setConfig(DEFAULT_CONFIG);
-    setIsStatusLoaded(false); // Reset status flag
+    setLogs([]); setConfig(DEFAULT_CONFIG); setIsStatusLoaded(false);
   };
 
   const fetchUserStatus = async () => {
@@ -327,7 +326,7 @@ export default function App() {
               setIsAdmin(data.username === "admin");
           }
       } catch (e) { console.error("Erro status:", e); }
-      finally { setIsStatusLoaded(true); } // Marca como carregado
+      finally { setIsStatusLoaded(true); }
   };
 
   useEffect(() => {
@@ -353,7 +352,6 @@ export default function App() {
   const handleSaveProfile = async () => { try { await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }); addLog("SUCCESS", "Perfil salvo!"); } catch(e) { addLog("ERROR", "Erro ao salvar."); } };
   
   const handleStart = async () => {
-      // Bloqueio redundante no botão iniciar
       if (!subscription.active || subscription.days_left <= 0) { alert("Assinatura expirada!"); return; }
       try {
           setIsRunning(true);
@@ -379,7 +377,14 @@ export default function App() {
                 }
             }
             if (newChannels.length === 0) newChannels.push({ num: 1, id: "", limit: 10, caption: "" });
-            setConfig(prev => ({ ...prev, api_id: parseInt(data.api_id) || prev.api_id, api_hash: data.api_hash || prev.api_hash, bot_token: data.bot_token || prev.bot_token, source_channel_id: parseInt(data.source_channel_id) || prev.source_channel_id, post_interval_seconds: parseInt(data.post_interval_seconds) || 60, filter_photos: data.filter_photos !== false, filter_videos: data.filter_videos !== false, filter_gifs: data.filter_gifs !== false, active_channels: newChannels }));
+            setConfig(prev => ({
+                ...prev, 
+                api_id: parseInt(data.api_id) || prev.api_id, api_hash: data.api_hash || prev.api_hash, bot_token: data.bot_token || prev.bot_token, source_channel_id: parseInt(data.source_channel_id) || prev.source_channel_id, post_interval_seconds: parseInt(data.post_interval_seconds) || 60, 
+                filter_photos: data.filter_photos !== false, filter_videos: data.filter_videos !== false, filter_gifs: data.filter_gifs !== false, 
+                // --- CARREGAR AGENDAMENTO ---
+                schedule_enabled: data.schedule_enabled === true, schedule_time: data.schedule_time || "09:00", schedule_daily: data.schedule_daily !== false,
+                active_channels: newChannels 
+            }));
             addLog("SUCCESS", "Perfil importado!");
         } catch(err) { addLog("ERROR", "Erro no JSON."); }
     };
@@ -425,20 +430,9 @@ export default function App() {
   const addChannel = () => { if (config.active_channels.length < 5) setConfig({ ...config, active_channels: [...config.active_channels, { num: config.active_channels.length + 1, id: "", limit: 10, caption: "" }] }); };
   const removeChannel = (idx) => { const n = config.active_channels.filter((_, i) => i !== idx); n.forEach((c, i) => c.num = i + 1); setConfig({ ...config, active_channels: n }); };
 
-  // --- RENDERIZAÇÃO PRINCIPAL ---
   if (!authToken) return <SystemLogin onLogin={handleSystemLogin} />;
-
-  // Ecrã de Loading enquanto verifica o status
-  if (!isStatusLoaded) return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-4">
-          <Activity className="text-blue-500 animate-spin" size={48}/>
-          <span className="text-gray-400 animate-pulse">A carregar o seu perfil...</span>
-      </div>
-  );
-
-  // Ecrã de Bloqueio (Rigoroso: 0 dias = bloqueio)
-  const isExpired = !subscription.active || subscription.days_left <= 0;
-  if (isExpired) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
+  if (!isStatusLoaded) return <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-4"><Activity className="text-blue-500 animate-spin" size={48}/><span className="text-gray-400 animate-pulse">A carregar...</span></div>;
+  if (!subscription.active || subscription.days_left <= 0) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans p-6">
@@ -465,8 +459,6 @@ export default function App() {
       </div>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Painel Config */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold text-blue-400">Configuração do Robô</h2>
@@ -478,12 +470,14 @@ export default function App() {
             </div>
             
             <div className="space-y-4">
+                {/* --- CREDENCIAIS --- */}
                 <div className="grid grid-cols-2 gap-4">
                     <div><label className="text-xs text-gray-400 block mb-1">API ID</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_id} onChange={e=>setConfig({...config, api_id: e.target.value})}/></div>
                     <div><label className="text-xs text-gray-400 block mb-1">API Hash</label><input type="password" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_hash} onChange={e=>setConfig({...config, api_hash: e.target.value})}/></div>
                 </div>
                 <div><label className="text-xs text-gray-400 block mb-1">Bot Token</label><input className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.bot_token} onChange={e=>setConfig({...config, bot_token: e.target.value})}/></div>
                 
+                {/* --- CONFIGURAÇÃO DE ORIGEM E FILTROS --- */}
                 <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-600">
                     <div className="flex justify-between items-start mb-3">
                         <label className="text-sm font-semibold text-yellow-400">Origem</label>
@@ -497,11 +491,30 @@ export default function App() {
                     </div>
                     <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config.source_channel_id} onChange={e=>setConfig({...config, source_channel_id: parseInt(e.target.value)||""})}/>
                     
-                    <div className="mb-4">
+                    {/* --- AGENDAMENTO E INTERVALO --- */}
+                    <div className="mb-4 bg-gray-800/50 p-3 rounded border border-gray-600/50">
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={12}/> Agendamento Automático</label>
+                            <button onClick={()=>setConfig({...config, schedule_enabled: !config.schedule_enabled})} className={`w-8 h-4 rounded-full transition relative ${config.schedule_enabled ? "bg-green-600":"bg-gray-600"}`}>
+                                <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-all ${config.schedule_enabled ? "right-0.5":"left-0.5"}`}></div>
+                            </button>
+                        </div>
+                        {config.schedule_enabled && (
+                            <div className="flex gap-2 items-center mb-3 animate-fade-in">
+                                <input type="time" className="bg-gray-900 border border-gray-600 text-white text-xs rounded p-1" value={config.schedule_time} onChange={e=>setConfig({...config, schedule_time: e.target.value})}/>
+                                <label className="text-[10px] text-gray-400 flex items-center gap-1 cursor-pointer">
+                                    <div onClick={()=>setConfig({...config, schedule_daily: !config.schedule_daily})} className={`w-3 h-3 border rounded-sm flex items-center justify-center ${config.schedule_daily ? "bg-blue-600 border-blue-600":"border-gray-500"}`}>
+                                        {config.schedule_daily && <CheckSquare size={10} className="text-white"/>}
+                                    </div>
+                                    Repetir Diariamente
+                                </label>
+                            </div>
+                        )}
                         <label className="text-[10px] text-gray-400 block mb-1">Intervalo entre Posts (segundos)</label>
                         <input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.post_interval_seconds} onChange={e=>setConfig({...config, post_interval_seconds: parseInt(e.target.value)||60})}/>
                     </div>
 
+                    {/* --- CANAIS DE DESTINO --- */}
                     <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                         {config.active_channels.map((ch, i) => (
                             <div key={i} className="bg-gray-800 p-3 rounded border border-gray-600 relative group">
@@ -516,7 +529,7 @@ export default function App() {
                     </div>
                     {config.active_channels.length < 5 && <button onClick={addChannel} className="mt-3 w-full py-2 border border-dashed border-gray-500 text-gray-400 rounded hover:bg-gray-800 text-xs flex justify-center items-center gap-1 transition"><PlusCircle size={14}/> Adicionar Canal</button>}
                 </div>
-
+                
                 <div className="flex gap-2 pt-2">
                     <button onClick={()=>setShowLogin(true)} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2.5 rounded font-medium flex justify-center items-center gap-2 text-sm transition shadow-lg shadow-blue-900/20"><KeyRound size={16}/> Autenticar Telegram</button>
                     <input type="file" ref={fileInputRef} style={{display:'none'}} accept=".json" onChange={handleHistoryFileChange} />
@@ -526,6 +539,7 @@ export default function App() {
             </div>
         </div>
 
+        {/* Painel de Logs e Controlo */}
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col h-[600px] sticky top-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2 text-green-400"><Terminal size={20} /> Atividades</h2>

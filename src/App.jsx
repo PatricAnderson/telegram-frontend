@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield, Edit3, ArrowRight, Clock } from 'lucide-react';
+import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield, Edit3, ArrowRight, Clock, Hash } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
@@ -282,12 +282,13 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     );
 };
 
+// --- COMPONENTE DE BLOQUEIO (RIGOROSO) ---
 const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   <div className="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center p-4 bg-opacity-95 backdrop-blur-sm">
     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center border border-red-900/50">
       <Lock size={48} className="text-red-500 mx-auto mb-4" />
       <h2 className="text-2xl font-bold text-white mb-2">Acesso Expirado</h2>
-      <p className="text-gray-400 mb-8">Sua assinatura terminou. Renove para continuar.</p>
+      <p className="text-gray-400 mb-8">O seu tempo acabou (0 dias restantes).<br/>Renove para continuar a usar o bot.</p>
       <div className="space-y-3">
         <button onClick={onOpenRenew} className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold flex justify-center gap-2"><CreditCard size={18}/> Renovar Agora</button>
         <button onClick={onLogout} className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-3 rounded font-medium">Sair</button>
@@ -296,6 +297,7 @@ const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   </div>
 );
 
+// --- COMPONENTE DE LOGIN ---
 const SystemLogin = ({ onLogin }) => {
     const [isRegister, setIsRegister] = useState(false);
     const [username, setUsername] = useState("");
@@ -342,13 +344,11 @@ const SystemLogin = ({ onLogin }) => {
 export default function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem("authToken"));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("currentUser"));
-  const [subscription, setSubscription] = useState({ active: false, days_left: 0 }); // Inicia inativo para segurança
+  const [subscription, setSubscription] = useState({ active: false, days_left: 0 }); // Inicia Inativo para segurança
   const [isStatusLoaded, setIsStatusLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [currentChannelIndex, setCurrentChannelIndex] = useState(null);
   
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState("Ocioso");
@@ -358,6 +358,9 @@ export default function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [loginStep, setLoginStep] = useState(1);
   const [loginData, setLoginData] = useState({ phone: "", code: "", password: "", hash: "" });
+  
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [currentChannelIndex, setCurrentChannelIndex] = useState(null);
 
   const logEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -421,6 +424,7 @@ export default function App() {
   const handleSaveProfile = async () => { try { await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }); addLog("SUCCESS", "Perfil salvo!"); } catch(e) { addLog("ERROR", "Erro ao salvar."); } };
   
   const handleStart = async () => {
+      // Bloqueio rigoroso no botão de iniciar
       if (!subscription.active || subscription.days_left <= 0) { alert("Assinatura expirada!"); return; }
       try {
           setIsRunning(true);
@@ -432,6 +436,20 @@ export default function App() {
 
   const handleStop = async () => { try { await authFetch(`/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); } };
   const handleResetHistory = async () => { if(isRunning) { alert("Pare o bot!"); return; } if(!confirm("Resetar?")) return; try { await authFetch("/reset_history", { method: "POST" }); addLog("SUCCESS", "Resetado!"); } catch(e) {} };
+  
+  // Set ID Manual
+  const handleSetStartId = async () => {
+      if(isRunning) { alert("Pare o bot!"); return; }
+      const id = prompt("Digite o ID inicial:");
+      if (!id) return;
+      try {
+          const res = await authFetch("/set_start_id", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ start_id: parseInt(id) }) });
+          const d = await res.json();
+          if(!res.ok) throw new Error(d.detail);
+          addLog("SUCCESS", d.message);
+      } catch(e) { addLog("ERROR", e.message); }
+  };
+
   const handleProfileLoadClick = () => profileInputRef.current.click();
   const handleProfileFileChange = (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -494,17 +512,19 @@ export default function App() {
     } catch (e) { alert(e.message); addLog("ERROR", e.message); }
   };
 
-  // --- Helper UI ---
   const updateChannel = (i, f, v) => { const n = [...config.active_channels]; n[i][f] = v; setConfig({ ...config, active_channels: n }); };
   const addChannel = () => { if (config.active_channels.length < 5) setConfig({ ...config, active_channels: [...config.active_channels, { num: config.active_channels.length + 1, id: "", limit: 10, caption: "", replacements: [] }] }); };
   const removeChannel = (idx) => { const n = config.active_channels.filter((_, i) => i !== idx); n.forEach((c, i) => c.num = i + 1); setConfig({ ...config, active_channels: n }); };
   
-  // Regras de Texto
   const openRulesModal = (index) => { setCurrentChannelIndex(index); setShowRulesModal(true); };
   const saveRules = (newRules) => { if (currentChannelIndex !== null) updateChannel(currentChannelIndex, 'replacements', newRules); };
 
   if (!authToken) return <SystemLogin onLogin={handleSystemLogin} />;
+  
+  // Ecrã de Loading enquanto verifica o status
   if (!isStatusLoaded) return <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-4"><Activity className="text-blue-500 animate-spin" size={48}/><span className="text-gray-400 animate-pulse">A carregar...</span></div>;
+  
+  // Ecrã de Bloqueio (Rigoroso)
   if (!subscription.active || subscription.days_left <= 0) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
 
   return (
@@ -594,7 +614,7 @@ export default function App() {
                                     <div className="w-16"><label className="text-[10px] text-gray-400 block mb-1">Limite</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs text-center focus:border-green-500 focus:outline-none" value={ch.limit} onChange={e=>updateChannel(i,'limit',e.target.value)}/></div>
                                     {config.active_channels.length > 1 && <button onClick={()=>removeChannel(i)} className="h-[34px] w-[34px] flex items-center justify-center bg-red-900/20 text-red-500 border border-red-900/30 rounded hover:bg-red-900/50 transition"><Trash2 size={16}/></button>}
                                 </div>
-                                <textarea className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-blue-500 focus:outline-none min-h-[60px] mb-2" placeholder={`Legenda... {filename} ou {original_caption}`} value={ch.caption} onChange={e=>updateChannel(i,'caption',e.target.value)}/>
+                                <textarea className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-blue-500 focus:outline-none min-h-[60px]" placeholder={`Legenda personalizada... {filename}`} value={ch.caption} onChange={e=>updateChannel(i,'caption',e.target.value)}/>
                                 <button onClick={() => openRulesModal(i)} className="w-full py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 border border-gray-600 flex justify-center items-center gap-2 transition">
                                     <Edit3 size={12}/> {ch.replacements?.length || 0} Regras de Texto
                                 </button>
@@ -603,11 +623,17 @@ export default function App() {
                     </div>
                     {config.active_channels.length < 5 && <button onClick={addChannel} className="mt-3 w-full py-2 border border-dashed border-gray-500 text-gray-400 rounded hover:bg-gray-800 text-xs flex justify-center items-center gap-1 transition"><PlusCircle size={14}/> Adicionar Canal</button>}
                 </div>
+                
                 <div className="flex gap-2 pt-2">
                     <button onClick={()=>setShowLogin(true)} className="flex-1 bg-blue-600 hover:bg-blue-500 py-2.5 rounded font-medium flex justify-center items-center gap-2 text-sm transition shadow-lg shadow-blue-900/20"><KeyRound size={16}/> Autenticar Telegram</button>
                     <input type="file" ref={fileInputRef} style={{display:'none'}} accept=".json" onChange={handleHistoryFileChange} />
                     <button onClick={handleImportHistoryClick} className="flex-1 bg-purple-600 hover:bg-purple-500 py-2.5 rounded font-medium flex justify-center items-center gap-2 text-sm transition shadow-lg shadow-purple-900/20"><Upload size={16}/> Histórico</button>
-                    <button onClick={handleResetHistory} className="flex-none bg-red-900/30 hover:bg-red-900/50 text-red-300 py-2.5 px-3 rounded font-medium flex justify-center items-center gap-2 text-sm transition border border-red-900/50" title="Reiniciar do ID 0"><RotateCcw size={16}/></button>
+                    
+                    {/* Botões de Ação Rápida */}
+                    <div className="flex gap-1">
+                        <button onClick={handleResetHistory} className="bg-red-900/30 hover:bg-red-900/50 text-red-300 py-2.5 px-3 rounded font-medium flex justify-center items-center gap-2 text-sm transition border border-red-900/50" title="Resetar Histórico"><RotateCcw size={16}/></button>
+                        <button onClick={handleSetStartId} className="bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 px-3 rounded font-medium flex justify-center items-center gap-2 text-sm transition border border-gray-600" title="Definir ID Manualmente"><Hash size={16}/></button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -634,6 +660,7 @@ export default function App() {
         </div>
       </div>
       
+      {/* Modal de Login Telegram */}
       {showLogin && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="bg-gray-800 p-8 rounded-xl w-full max-w-md border border-gray-600 shadow-2xl">

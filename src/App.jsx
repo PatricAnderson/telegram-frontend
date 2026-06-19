@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield, Edit3, ArrowRight, Clock, Hash } from 'lucide-react';
+import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield, Edit3, ArrowRight, Clock, Hash, Link } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
@@ -13,10 +13,80 @@ const DEFAULT_CONFIG = {
     post_interval_seconds: 60,
     filter_photos: true, filter_videos: true, filter_gifs: true,
     schedule_enabled: false, schedule_time: "09:00", schedule_daily: true,
-    active_channels: [{ num: 1, id: "", limit: 10, caption: "", replacements: [] }]
+    active_channels: [{ num: 1, id: "", limit: 10, caption: "", replacements: [], buttons: [] }]
 };
 
-// --- COMPONENTE: MODAL DE REGRAS DE TEXTO ---
+// --- MODAL DE BOTÕES INLINE ---
+const ButtonModal = ({ isOpen, onClose, buttons, onSave }) => {
+    const [localButtons, setLocalButtons] = useState([]);
+    const [btnText, setBtnText] = useState("");
+    const [btnUrl, setBtnUrl] = useState("");
+
+    useEffect(() => { if(isOpen) setLocalButtons(buttons || []); }, [isOpen, buttons]);
+
+    if (!isOpen) return null;
+
+    const addButton = () => {
+        if (!btnText || !btnUrl) { alert("Preencha o Texto e o Link!"); return; }
+        if (!btnUrl.startsWith("http")) { alert("O link deve começar com http:// ou https://"); return; }
+        setLocalButtons([...localButtons, { text: btnText, url: btnUrl }]);
+        setBtnText(""); setBtnUrl("");
+    };
+
+    const removeButton = (idx) => {
+        setLocalButtons(localButtons.filter((_, i) => i !== idx));
+    };
+
+    const handleSave = () => {
+        onSave(localButtons);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[80] p-4 backdrop-blur-sm">
+            <div className="bg-gray-800 p-6 rounded-xl w-full max-w-lg border border-gray-600 shadow-2xl relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={20} /></button>
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-white"><Link className="text-blue-400"/> Botões Embutidos (Inline)</h3>
+                
+                <div className="bg-gray-900/50 p-3 rounded mb-4 text-xs text-gray-400 border border-gray-700">
+                    <p className="mb-1">Crie botões interativos abaixo das imagens.</p>
+                    <p className="text-yellow-400">⚠️ Nota: O Telegram dita as cores dos botões de acordo com o tema da aplicação de quem os vê.</p>
+                </div>
+
+                <div className="flex gap-2 mb-4 items-end">
+                    <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 block mb-1">Texto (Pode usar emojis)</label>
+                        <input className="w-full bg-gray-700 p-2 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                            placeholder="🚀 O Meu Link" value={btnText} onChange={e => setBtnText(e.target.value)} />
+                    </div>
+                    <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 block mb-1">Link (URL)</label>
+                        <input className="w-full bg-gray-700 p-2 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                            placeholder="https://t.me/meucanal" value={btnUrl} onChange={e => setBtnUrl(e.target.value)} />
+                    </div>
+                    <button onClick={addButton} className="bg-green-600 hover:bg-green-500 p-2 rounded text-white mb-0.5"><PlusCircle size={18}/></button>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto mb-6 custom-scrollbar space-y-2">
+                    {localButtons.length === 0 && <p className="text-gray-600 text-center text-sm py-4">Nenhum botão criado.</p>}
+                    {localButtons.map((b, i) => (
+                        <div key={i} className="flex justify-between items-center bg-gray-700/50 p-2 rounded border border-gray-600">
+                            <div className="flex items-center gap-3 text-sm overflow-hidden">
+                                <span className="bg-blue-900/30 text-blue-200 px-3 py-1 rounded-full border border-blue-800/50 truncate font-medium">{b.text}</span>
+                                <span className="text-gray-500 text-xs truncate max-w-[150px]">{b.url}</span>
+                            </div>
+                            <button onClick={() => removeButton(i)} className="text-gray-400 hover:text-red-400"><Trash2 size={14}/></button>
+                        </div>
+                    ))}
+                </div>
+
+                <button onClick={handleSave} className="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-white transition">Salvar Botões</button>
+            </div>
+        </div>
+    );
+};
+
+// --- MODAL DE REGRAS DE TEXTO ---
 const ReplacementModal = ({ isOpen, onClose, rules, onSave }) => {
     const [localRules, setLocalRules] = useState([]);
     const [newOld, setNewOld] = useState("");
@@ -87,7 +157,7 @@ const ReplacementModal = ({ isOpen, onClose, rules, onSave }) => {
     );
 };
 
-// --- COMPONENTE: MODAL DE ADMINISTRAÇÃO ---
+// --- MODAL DE ADMINISTRAÇÃO ---
 const AdminPanel = ({ isOpen, onClose, authFetch }) => {
     const [tab, setTab] = useState("users");
     const [users, setUsers] = useState([]);
@@ -195,7 +265,7 @@ const AdminPanel = ({ isOpen, onClose, authFetch }) => {
     );
 };
 
-// --- COMPONENTE: MODAL DE RENOVAÇÃO ---
+// --- MODAL DE RENOVAÇÃO ---
 const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => {
     const [mode, setMode] = useState("select");
     const [key, setKey] = useState("");
@@ -282,13 +352,12 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
     );
 };
 
-// --- COMPONENTE DE BLOQUEIO (RIGOROSO) ---
 const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   <div className="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center p-4 bg-opacity-95 backdrop-blur-sm">
     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center border border-red-900/50">
       <Lock size={48} className="text-red-500 mx-auto mb-4" />
       <h2 className="text-2xl font-bold text-white mb-2">Acesso Expirado</h2>
-      <p className="text-gray-400 mb-8">O seu tempo acabou (0 dias restantes).<br/>Renove para continuar a usar o bot.</p>
+      <p className="text-gray-400 mb-8">Sua assinatura terminou. Renove para continuar.</p>
       <div className="space-y-3">
         <button onClick={onOpenRenew} className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold flex justify-center gap-2"><CreditCard size={18}/> Renovar Agora</button>
         <button onClick={onLogout} className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-3 rounded font-medium">Sair</button>
@@ -297,7 +366,7 @@ const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
   </div>
 );
 
-// --- COMPONENTE DE LOGIN ---
+// --- COMPONENTE DE LOGIN NO SISTEMA ---
 const SystemLogin = ({ onLogin }) => {
     const [isRegister, setIsRegister] = useState(false);
     const [username, setUsername] = useState("");
@@ -326,7 +395,7 @@ const SystemLogin = ({ onLogin }) => {
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Activity className="text-blue-500"/> {APP_NAME}</h2>
             <h3 className="text-xl text-white mb-4">{isRegister ? "Criar Nova Conta" : "Acesso ao Sistema"}</h3>
-            {error && <div className="p-3 rounded mb-4 text-sm bg-red-900/30 text-red-200 border border-red-800/50">{error}</div>}
+            {error && <div className={`p-3 rounded mb-4 text-sm ${error.includes("criada") ? "bg-green-900/30 text-green-200" : "bg-red-900/30 text-red-200"} border border-gray-700`}>{error}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
                 <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded text-white focus:border-blue-500 outline-none" placeholder="Utilizador" value={username} onChange={e => setUsername(e.target.value)} required />
                 <input type="password" className="w-full bg-gray-900 border border-gray-700 p-3 rounded text-white focus:border-blue-500 outline-none" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} required />
@@ -344,12 +413,16 @@ const SystemLogin = ({ onLogin }) => {
 export default function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem("authToken"));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("currentUser"));
-  const [subscription, setSubscription] = useState({ active: false, days_left: 0 }); // Inicia Inativo para segurança
+  const [subscription, setSubscription] = useState({ active: false, days_left: 0 });
   const [isStatusLoaded, setIsStatusLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showButtonModal, setShowButtonModal] = useState(false);
+  const [currentChannelIndex, setCurrentChannelIndex] = useState(null);
+
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState("Ocioso");
   const [isRunning, setIsRunning] = useState(false);
@@ -358,9 +431,6 @@ export default function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [loginStep, setLoginStep] = useState(1);
   const [loginData, setLoginData] = useState({ phone: "", code: "", password: "", hash: "" });
-  
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [currentChannelIndex, setCurrentChannelIndex] = useState(null);
 
   const logEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -421,14 +491,39 @@ export default function App() {
   useEffect(() => logEndRef.current?.scrollIntoView({ behavior: "smooth" }), [logs]);
   const addLog = (level, msg) => setLogs(prev => [...prev, { level, msg, time: new Date().toLocaleTimeString() }]);
 
+  const handleSetStartId = async () => {
+      if(isRunning) { alert("Pare o bot primeiro!"); return; }
+      const idStr = prompt("Digite o ID da mensagem para começar (Ex: 2730):");
+      if (!idStr) return;
+      const id = parseInt(idStr);
+      if (isNaN(id)) { alert("Número inválido!"); return; }
+
+      try {
+          const res = await authFetch("/set_start_id", { 
+              method: "POST", 
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ start_id: id })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail);
+          addLog("SUCCESS", data.message);
+      } catch (e) { addLog("ERROR", e.message); }
+  };
+
   const handleSaveProfile = async () => { try { await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }); addLog("SUCCESS", "Perfil salvo!"); } catch(e) { addLog("ERROR", "Erro ao salvar."); } };
   
   const handleStart = async () => {
-      // Bloqueio rigoroso no botão de iniciar
       if (!subscription.active || subscription.days_left <= 0) { alert("Assinatura expirada!"); return; }
       try {
           setIsRunning(true);
-          const payload = { ...config, active_channels: config.active_channels.map(ch => ({ ...ch, id: parseInt(ch.id)||0, limit: parseInt(ch.limit)||0 })) };
+          const payload = { 
+              ...config, 
+              source_channel_id: parseInt(config.source_channel_id) || 0,
+              post_interval_seconds: parseInt(config.post_interval_seconds) || 60,
+              active_channels: config.active_channels.map(ch => ({ 
+                  ...ch, id: parseInt(ch.id)||0, limit: parseInt(ch.limit)||0 
+              })) 
+          };
           const res = await authFetch(`/start`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
           if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
       } catch (e) { addLog("ERROR", e.message); setIsRunning(false); }
@@ -437,19 +532,6 @@ export default function App() {
   const handleStop = async () => { try { await authFetch(`/stop`, { method: "POST" }); setIsRunning(false); } catch (e) { addLog("ERROR", "Erro ao parar."); } };
   const handleResetHistory = async () => { if(isRunning) { alert("Pare o bot!"); return; } if(!confirm("Resetar?")) return; try { await authFetch("/reset_history", { method: "POST" }); addLog("SUCCESS", "Resetado!"); } catch(e) {} };
   
-  // Set ID Manual
-  const handleSetStartId = async () => {
-      if(isRunning) { alert("Pare o bot!"); return; }
-      const id = prompt("Digite o ID inicial:");
-      if (!id) return;
-      try {
-          const res = await authFetch("/set_start_id", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ start_id: parseInt(id) }) });
-          const d = await res.json();
-          if(!res.ok) throw new Error(d.detail);
-          addLog("SUCCESS", d.message);
-      } catch(e) { addLog("ERROR", e.message); }
-  };
-
   const handleProfileLoadClick = () => profileInputRef.current.click();
   const handleProfileFileChange = (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -460,10 +542,10 @@ export default function App() {
             const newChannels = [];
             for (let i = 1; i <= 5; i++) {
                 if (data[`enable_channel_${i}`] === true) {
-                    newChannels.push({ num: i, id: parseInt(data[`destination_channel_id_${i}`]) || "", limit: parseInt(data[`daily_limit_channel_${i}`]) || 10, caption: data[`custom_caption_${i}`] || "", replacements: [] });
+                    newChannels.push({ num: i, id: parseInt(data[`destination_channel_id_${i}`]) || "", limit: parseInt(data[`daily_limit_channel_${i}`]) || 10, caption: data[`custom_caption_${i}`] || "", replacements: [], buttons: [] });
                 }
             }
-            if (newChannels.length === 0) newChannels.push({ num: 1, id: "", limit: 10, caption: "", replacements: [] });
+            if (newChannels.length === 0) newChannels.push({ num: 1, id: "", limit: 10, caption: "", replacements: [], buttons: [] });
             setConfig(prev => ({
                 ...prev, 
                 api_id: parseInt(data.api_id) || prev.api_id, api_hash: data.api_hash || prev.api_hash, bot_token: data.bot_token || prev.bot_token, source_channel_id: parseInt(data.source_channel_id) || prev.source_channel_id, post_interval_seconds: parseInt(data.post_interval_seconds) || 60, 
@@ -513,18 +595,17 @@ export default function App() {
   };
 
   const updateChannel = (i, f, v) => { const n = [...config.active_channels]; n[i][f] = v; setConfig({ ...config, active_channels: n }); };
-  const addChannel = () => { if (config.active_channels.length < 5) setConfig({ ...config, active_channels: [...config.active_channels, { num: config.active_channels.length + 1, id: "", limit: 10, caption: "", replacements: [] }] }); };
+  const addChannel = () => { if (config.active_channels.length < 5) setConfig({ ...config, active_channels: [...config.active_channels, { num: config.active_channels.length + 1, id: "", limit: 10, caption: "", replacements: [], buttons: [] }] }); };
   const removeChannel = (idx) => { const n = config.active_channels.filter((_, i) => i !== idx); n.forEach((c, i) => c.num = i + 1); setConfig({ ...config, active_channels: n }); };
   
   const openRulesModal = (index) => { setCurrentChannelIndex(index); setShowRulesModal(true); };
   const saveRules = (newRules) => { if (currentChannelIndex !== null) updateChannel(currentChannelIndex, 'replacements', newRules); };
 
+  const openButtonModal = (index) => { setCurrentChannelIndex(index); setShowButtonModal(true); };
+  const saveButtons = (newButtons) => { if (currentChannelIndex !== null) updateChannel(currentChannelIndex, 'buttons', newButtons); };
+
   if (!authToken) return <SystemLogin onLogin={handleSystemLogin} />;
-  
-  // Ecrã de Loading enquanto verifica o status
   if (!isStatusLoaded) return <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-4"><Activity className="text-blue-500 animate-spin" size={48}/><span className="text-gray-400 animate-pulse">A carregar...</span></div>;
-  
-  // Ecrã de Bloqueio (Rigoroso)
   if (!subscription.active || subscription.days_left <= 0) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
 
   return (
@@ -532,6 +613,7 @@ export default function App() {
       <RenewModal isOpen={showRenewModal} onClose={() => setShowRenewModal(false)} authFetch={authFetch} refreshStatus={fetchUserStatus} isLocked={false} />
       <AdminPanel isOpen={showAdminModal} onClose={() => setShowAdminModal(false)} authFetch={authFetch} />
       <ReplacementModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} rules={currentChannelIndex !== null ? config.active_channels[currentChannelIndex].replacements : []} onSave={saveRules} />
+      <ButtonModal isOpen={showButtonModal} onClose={() => setShowButtonModal(false)} buttons={currentChannelIndex !== null ? config.active_channels[currentChannelIndex].buttons : []} onSave={saveButtons} />
       
       <div className="max-w-6xl mx-auto mb-6 bg-gray-800 rounded-lg p-3 flex justify-between items-center border border-gray-700 shadow-md">
         <div className="flex items-center gap-4">
@@ -554,7 +636,7 @@ export default function App() {
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit">
-            <div className="flex justify-between items-center mb-4">
+             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-bold text-blue-400">Configuração do Robô</h2>
                 <div className="flex gap-2">
                     <input type="file" ref={profileInputRef} style={{ display: 'none' }} accept=".json" onChange={handleProfileFileChange} />
@@ -583,7 +665,6 @@ export default function App() {
                     </div>
                     <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config.source_channel_id} onChange={e=>setConfig({...config, source_channel_id: parseInt(e.target.value)||""})}/>
                     
-                    {/* AGENDAMENTO */}
                     <div className="mb-4 bg-gray-800/50 p-3 rounded border border-gray-600/50">
                         <div className="flex justify-between items-center mb-2">
                             <label className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={12}/> Agendamento Automático</label>
@@ -614,10 +695,15 @@ export default function App() {
                                     <div className="w-16"><label className="text-[10px] text-gray-400 block mb-1">Limite</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs text-center focus:border-green-500 focus:outline-none" value={ch.limit} onChange={e=>updateChannel(i,'limit',e.target.value)}/></div>
                                     {config.active_channels.length > 1 && <button onClick={()=>removeChannel(i)} className="h-[34px] w-[34px] flex items-center justify-center bg-red-900/20 text-red-500 border border-red-900/30 rounded hover:bg-red-900/50 transition"><Trash2 size={16}/></button>}
                                 </div>
-                                <textarea className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-blue-500 focus:outline-none min-h-[60px]" placeholder={`Legenda personalizada... {filename}`} value={ch.caption} onChange={e=>updateChannel(i,'caption',e.target.value)}/>
-                                <button onClick={() => openRulesModal(i)} className="w-full py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 border border-gray-600 flex justify-center items-center gap-2 transition">
-                                    <Edit3 size={12}/> {ch.replacements?.length || 0} Regras de Texto
-                                </button>
+                                <textarea className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-blue-500 focus:outline-none min-h-[60px] mb-2" placeholder={`Legenda personalizada... {filename}`} value={ch.caption} onChange={e=>updateChannel(i,'caption',e.target.value)}/>
+                                <div className="flex gap-2">
+                                    <button onClick={() => openRulesModal(i)} className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 border border-gray-600 flex justify-center items-center gap-1 transition">
+                                        <Edit3 size={12}/> Regras
+                                    </button>
+                                    <button onClick={() => openButtonModal(i)} className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 border border-gray-600 flex justify-center items-center gap-1 transition">
+                                        <Link size={12}/> Botões
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -629,7 +715,6 @@ export default function App() {
                     <input type="file" ref={fileInputRef} style={{display:'none'}} accept=".json" onChange={handleHistoryFileChange} />
                     <button onClick={handleImportHistoryClick} className="flex-1 bg-purple-600 hover:bg-purple-500 py-2.5 rounded font-medium flex justify-center items-center gap-2 text-sm transition shadow-lg shadow-purple-900/20"><Upload size={16}/> Histórico</button>
                     
-                    {/* Botões de Ação Rápida */}
                     <div className="flex gap-1">
                         <button onClick={handleResetHistory} className="bg-red-900/30 hover:bg-red-900/50 text-red-300 py-2.5 px-3 rounded font-medium flex justify-center items-center gap-2 text-sm transition border border-red-900/50" title="Resetar Histórico"><RotateCcw size={16}/></button>
                         <button onClick={handleSetStartId} className="bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 px-3 rounded font-medium flex justify-center items-center gap-2 text-sm transition border border-gray-600" title="Definir ID Manualmente"><Hash size={16}/></button>

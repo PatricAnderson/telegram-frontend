@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield, Edit3, ArrowRight, Clock, Hash, Link } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
-// ⚠️ ATENÇÃO: SUBSTITUA PELO SEU LINK DO RAILWAY!
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
 const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
@@ -68,12 +67,12 @@ const ButtonModal = ({ isOpen, onClose, buttons, onSave }) => {
                 </div>
 
                 <div className="max-h-48 overflow-y-auto mb-6 custom-scrollbar space-y-2">
-                    {localButtons.length === 0 && <p className="text-gray-600 text-center text-sm py-4">Nenhum botão criado.</p>}
-                    {localButtons.map((b, i) => (
+                    {(localButtons || []).length === 0 && <p className="text-gray-600 text-center text-sm py-4">Nenhum botão criado.</p>}
+                    {(localButtons || []).map((b, i) => (
                         <div key={i} className="flex justify-between items-center bg-gray-700/50 p-2 rounded border border-gray-600">
                             <div className="flex items-center gap-3 text-sm overflow-hidden">
-                                <span className="bg-blue-900/30 text-blue-200 px-3 py-1 rounded-full border border-blue-800/50 truncate font-medium">{b.text}</span>
-                                <span className="text-gray-500 text-xs truncate max-w-[150px]">{b.url}</span>
+                                <span className="bg-blue-900/30 text-blue-200 px-3 py-1 rounded-full border border-blue-800/50 truncate font-medium">{String(b.text)}</span>
+                                <span className="text-gray-500 text-xs truncate max-w-[150px]">{String(b.url)}</span>
                             </div>
                             <button onClick={() => removeButton(i)} className="text-gray-400 hover:text-red-400"><Trash2 size={14}/></button>
                         </div>
@@ -138,13 +137,13 @@ const ReplacementModal = ({ isOpen, onClose, rules, onSave }) => {
                 </div>
 
                 <div className="max-h-48 overflow-y-auto mb-6 custom-scrollbar space-y-2">
-                    {localRules.length === 0 && <p className="text-gray-600 text-center text-sm py-4">Nenhuma regra definida.</p>}
-                    {localRules.map((r, i) => (
+                    {(localRules || []).length === 0 && <p className="text-gray-600 text-center text-sm py-4">Nenhuma regra definida.</p>}
+                    {(localRules || []).map((r, i) => (
                         <div key={i} className="flex justify-between items-center bg-gray-700/50 p-2 rounded border border-gray-600">
                             <div className="flex items-center gap-2 text-sm overflow-hidden">
-                                <span className="bg-red-900/30 text-red-200 px-2 rounded truncate max-w-[120px]">{r.old}</span>
+                                <span className="bg-red-900/30 text-red-200 px-2 rounded truncate max-w-[120px]">{String(r.old)}</span>
                                 <ArrowRight size={12} className="text-gray-500"/>
-                                <span className="bg-green-900/30 text-green-200 px-2 rounded truncate max-w-[120px]">{r.new || "(vazio)"}</span>
+                                <span className="bg-green-900/30 text-green-200 px-2 rounded truncate max-w-[120px]">{String(r.new || "(vazio)")}</span>
                             </div>
                             <button onClick={() => removeRule(i)} className="text-gray-400 hover:text-red-400"><Trash2 size={14}/></button>
                         </div>
@@ -167,7 +166,7 @@ const AdminPanel = ({ isOpen, onClose, authFetch }) => {
 
     useEffect(() => { if (isOpen) { loadUsers(); loadKeys(); } }, [isOpen]);
 
-    const loadUsers = async () => { try { const res = await authFetch("/admin/users"); setUsers(await res.json()); } catch(e) { console.error(e); } };
+    const loadUsers = async () => { try { const res = await authFetch("/admin/users"); setUsers(await res.json()); } catch(e) {} };
     const loadKeys = async () => { try { const res = await authFetch("/admin/keys"); setKeys(await res.json()); } catch(e) {} };
 
     const handleAddTime = async (username) => {
@@ -217,7 +216,7 @@ const AdminPanel = ({ isOpen, onClose, authFetch }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {users.map(u => (
+                                    {(users || []).map(u => (
                                         <tr key={u.username} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition">
                                             <td className="p-3 font-medium text-white">{u.username}</td>
                                             <td className="p-3"><span className={`px-2 py-1 rounded text-xs font-bold ${u.active?"bg-green-900/50 text-green-400":"bg-red-900/50 text-red-400"}`}>{u.active?"ATIVO":"EXPIRADO"}</span></td>
@@ -247,7 +246,7 @@ const AdminPanel = ({ isOpen, onClose, authFetch }) => {
                                 <button onClick={handleGenKeys} className="bg-green-600 px-4 py-2 rounded hover:bg-green-500 text-white font-bold h-10 flex items-center gap-2"><PlusCircle size={16}/> Gerar Chaves</button>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {Object.entries(keys).map(([k, days]) => (
+                                {Object.entries(keys || {}).map(([k, days]) => (
                                     <div key={k} className="bg-gray-900 p-3 rounded border border-gray-700 flex justify-between items-center hover:border-gray-500 transition group">
                                         <code className="text-sm text-yellow-400 font-mono tracking-wider">{k}</code>
                                         <div className="flex items-center gap-2">
@@ -395,7 +394,7 @@ const SystemLogin = ({ onLogin }) => {
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Activity className="text-blue-500"/> {APP_NAME}</h2>
             <h3 className="text-xl text-white mb-4">{isRegister ? "Criar Nova Conta" : "Acesso ao Sistema"}</h3>
-            {error && <div className={`p-3 rounded mb-4 text-sm ${error.includes("criada") ? "bg-green-900/30 text-green-200" : "bg-red-900/30 text-red-200"} border border-gray-700`}>{error}</div>}
+            {error && <div className={`p-3 rounded mb-4 text-sm ${String(error).includes("criada") ? "bg-green-900/30 text-green-200" : "bg-red-900/30 text-red-200"} border border-gray-700`}>{String(error)}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
                 <input className="w-full bg-gray-900 border border-gray-700 p-3 rounded text-white focus:border-blue-500 outline-none" placeholder="Utilizador" value={username} onChange={e => setUsername(e.target.value)} required />
                 <input type="password" className="w-full bg-gray-900 border border-gray-700 p-3 rounded text-white focus:border-blue-500 outline-none" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} required />
@@ -464,7 +463,7 @@ export default function App() {
           const res = await authFetch("/user/status");
           const data = await res.json();
           if (res.ok) {
-              setSubscription(data.subscription);
+              setSubscription(data.subscription || { active: false, days_left: 0 });
               setIsAdmin(data.username === "admin");
           }
       } catch (e) { console.error("Erro status:", e); }
@@ -474,12 +473,17 @@ export default function App() {
   useEffect(() => {
     if (authToken && !API_URL.includes("seu-backend")) {
         fetchUserStatus();
-        authFetch("/profile").then(r=>r.json()).then(d=>{ if(d.api_id) setConfig(p=>({...p, ...d})) }).catch(()=>{});
+        authFetch("/profile").then(r=>r.json()).then(d=>{ 
+            if(d && (d.api_id || (d.active_channels && d.active_channels.length > 0))) { 
+                setConfig(p => ({...p, ...d})); 
+            } 
+        }).catch(()=>{});
+        
         const ws = new WebSocket(`${WS_URL}/${authToken}`);
         ws.onmessage = (e) => {
             try {
                 const d = JSON.parse(e.data);
-                if (d.type==="log") setLogs(p=>[...p,{level:d.level,msg:d.message,time:new Date().toLocaleTimeString()}]);
+                if (d.type==="log") setLogs(p => [...(p || []), { level: d.level, msg: d.message, time: new Date().toLocaleTimeString() }]);
                 else if (d.type==="status") setStatus(d.status);
             } catch {}
         };
@@ -489,7 +493,9 @@ export default function App() {
   }, [authToken]);
 
   useEffect(() => logEndRef.current?.scrollIntoView({ behavior: "smooth" }), [logs]);
-  const addLog = (level, msg) => setLogs(prev => [...prev, { level, msg, time: new Date().toLocaleTimeString() }]);
+  
+  // Função defensiva para adicionar logs
+  const addLog = (level, msg) => setLogs(prev => [...(prev || []), { level, msg, time: new Date().toLocaleTimeString() }]);
 
   const handleSetStartId = async () => {
       if(isRunning) { alert("Pare o bot primeiro!"); return; }
@@ -513,14 +519,14 @@ export default function App() {
   const handleSaveProfile = async () => { try { await authFetch("/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }); addLog("SUCCESS", "Perfil salvo!"); } catch(e) { addLog("ERROR", "Erro ao salvar."); } };
   
   const handleStart = async () => {
-      if (!subscription.active || subscription.days_left <= 0) { alert("Assinatura expirada!"); return; }
+      if (!subscription?.active || subscription?.days_left <= 0) { alert("Assinatura expirada!"); return; }
       try {
           setIsRunning(true);
           const payload = { 
               ...config, 
               source_channel_id: parseInt(config.source_channel_id) || 0,
               post_interval_seconds: parseInt(config.post_interval_seconds) || 60,
-              active_channels: config.active_channels.map(ch => ({ 
+              active_channels: (config.active_channels || []).map(ch => ({ 
                   ...ch, id: parseInt(ch.id)||0, limit: parseInt(ch.limit)||0 
               })) 
           };
@@ -594,9 +600,43 @@ export default function App() {
     } catch (e) { alert(e.message); addLog("ERROR", e.message); }
   };
 
-  const updateChannel = (i, f, v) => { const n = [...config.active_channels]; n[i][f] = v; setConfig({ ...config, active_channels: n }); };
-  const addChannel = () => { if (config.active_channels.length < 5) setConfig({ ...config, active_channels: [...config.active_channels, { num: config.active_channels.length + 1, id: "", limit: 10, caption: "", replacements: [], buttons: [] }] }); };
-  const removeChannel = (idx) => { const n = config.active_channels.filter((_, i) => i !== idx); n.forEach((c, i) => c.num = i + 1); setConfig({ ...config, active_channels: n }); };
+  // --- ATUALIZAÇÕES DE ESTADO SEGURAS E IMUTÁVEIS ---
+  const updateChannel = (i, f, v) => { 
+      setConfig(prev => {
+          const newChannels = [...(prev.active_channels || [])];
+          if (newChannels[i]) {
+              newChannels[i] = { ...newChannels[i], [f]: v };
+          }
+          return { ...prev, active_channels: newChannels };
+      });
+  };
+  
+  const addChannel = () => { 
+      setConfig(prev => {
+          const currentChannels = prev.active_channels || [];
+          if (currentChannels.length >= 5) return prev;
+          return {
+              ...prev,
+              active_channels: [
+                  ...currentChannels,
+                  { num: currentChannels.length + 1, id: "", limit: 10, caption: "", replacements: [], buttons: [] }
+              ]
+          };
+      });
+  };
+  
+  const removeChannel = (idx) => { 
+      setConfig(prev => {
+          const currentChannels = prev.active_channels || [];
+          const newChannels = currentChannels
+              .filter((_, i) => i !== idx)
+              .map((c, i) => ({ ...c, num: i + 1 }));
+          return { ...prev, active_channels: newChannels };
+      });
+      
+      if (currentChannelIndex === idx) setCurrentChannelIndex(null);
+      else if (currentChannelIndex !== null && currentChannelIndex > idx) setCurrentChannelIndex(currentChannelIndex - 1);
+  };
   
   const openRulesModal = (index) => { setCurrentChannelIndex(index); setShowRulesModal(true); };
   const saveRules = (newRules) => { if (currentChannelIndex !== null) updateChannel(currentChannelIndex, 'replacements', newRules); };
@@ -604,16 +644,26 @@ export default function App() {
   const openButtonModal = (index) => { setCurrentChannelIndex(index); setShowButtonModal(true); };
   const saveButtons = (newButtons) => { if (currentChannelIndex !== null) updateChannel(currentChannelIndex, 'buttons', newButtons); };
 
+  // --- RENDERIZAÇÃO PRINCIPAL ---
   if (!authToken) return <SystemLogin onLogin={handleSystemLogin} />;
+  
+  // Ecrã de carregamento enquanto valida subscrição
   if (!isStatusLoaded) return <div className="min-h-screen bg-gray-900 flex items-center justify-center flex-col gap-4"><Activity className="text-blue-500 animate-spin" size={48}/><span className="text-gray-400 animate-pulse">A carregar...</span></div>;
-  if (!subscription.active || subscription.days_left <= 0) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
+  
+  // Ecrã de bloqueio se expirar
+  if (!subscription?.active || subscription?.days_left <= 0) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
+
+  // Variável segura para mapear canais sem crash
+  const channelsToRender = config.active_channels || [];
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans p-6">
       <RenewModal isOpen={showRenewModal} onClose={() => setShowRenewModal(false)} authFetch={authFetch} refreshStatus={fetchUserStatus} isLocked={false} />
       <AdminPanel isOpen={showAdminModal} onClose={() => setShowAdminModal(false)} authFetch={authFetch} />
-      <ReplacementModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} rules={currentChannelIndex !== null ? config.active_channels[currentChannelIndex].replacements : []} onSave={saveRules} />
-      <ButtonModal isOpen={showButtonModal} onClose={() => setShowButtonModal(false)} buttons={currentChannelIndex !== null ? config.active_channels[currentChannelIndex].buttons : []} onSave={saveButtons} />
+      
+      {/* Modais seguros (uso de optional chaining para prevenir crash se a lista for recriada) */}
+      <ReplacementModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} rules={channelsToRender[currentChannelIndex]?.replacements || []} onSave={saveRules} />
+      <ButtonModal isOpen={showButtonModal} onClose={() => setShowButtonModal(false)} buttons={channelsToRender[currentChannelIndex]?.buttons || []} onSave={saveButtons} />
       
       <div className="max-w-6xl mx-auto mb-6 bg-gray-800 rounded-lg p-3 flex justify-between items-center border border-gray-700 shadow-md">
         <div className="flex items-center gap-4">
@@ -622,7 +672,7 @@ export default function App() {
             <div className="flex items-center gap-2 text-sm">
                 <span className="text-gray-400">Plano:</span>
                 <span className="text-green-400 font-bold bg-green-900/30 px-2 py-0.5 rounded flex items-center gap-1"><CheckSquare size={12}/> Ativo</span>
-                <span className="text-gray-500 text-xs">({subscription.days_left} dias restantes)</span>
+                <span className="text-gray-500 text-xs">({subscription?.days_left || 0} dias restantes)</span>
             </div>
         </div>
         <div className="flex items-center gap-4">
@@ -647,10 +697,10 @@ export default function App() {
             
             <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                    <div><label className="text-xs text-gray-400 block mb-1">API ID</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_id} onChange={e=>setConfig({...config, api_id: e.target.value})}/></div>
-                    <div><label className="text-xs text-gray-400 block mb-1">API Hash</label><input type="password" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_hash} onChange={e=>setConfig({...config, api_hash: e.target.value})}/></div>
+                    <div><label className="text-xs text-gray-400 block mb-1">API ID</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_id || ""} onChange={e=>setConfig({...config, api_id: e.target.value})}/></div>
+                    <div><label className="text-xs text-gray-400 block mb-1">API Hash</label><input type="password" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_hash || ""} onChange={e=>setConfig({...config, api_hash: e.target.value})}/></div>
                 </div>
-                <div><label className="text-xs text-gray-400 block mb-1">Bot Token</label><input className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.bot_token} onChange={e=>setConfig({...config, bot_token: e.target.value})}/></div>
+                <div><label className="text-xs text-gray-400 block mb-1">Bot Token</label><input className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.bot_token || ""} onChange={e=>setConfig({...config, bot_token: e.target.value})}/></div>
                 
                 <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-600">
                     <div className="flex justify-between items-start mb-3">
@@ -663,7 +713,7 @@ export default function App() {
                             ))}
                         </div>
                     </div>
-                    <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config.source_channel_id} onChange={e=>setConfig({...config, source_channel_id: parseInt(e.target.value)||""})}/>
+                    <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config.source_channel_id || ""} onChange={e=>setConfig({...config, source_channel_id: parseInt(e.target.value)||""})}/>
                     
                     <div className="mb-4 bg-gray-800/50 p-3 rounded border border-gray-600/50">
                         <div className="flex justify-between items-center mb-2">
@@ -674,7 +724,7 @@ export default function App() {
                         </div>
                         {config.schedule_enabled && (
                             <div className="flex gap-2 items-center mb-3 animate-fade-in">
-                                <input type="time" className="bg-gray-900 border border-gray-600 text-white text-xs rounded p-1" value={config.schedule_time} onChange={e=>setConfig({...config, schedule_time: e.target.value})}/>
+                                <input type="time" className="bg-gray-900 border border-gray-600 text-white text-xs rounded p-1" value={config.schedule_time || "09:00"} onChange={e=>setConfig({...config, schedule_time: e.target.value})}/>
                                 <label className="text-[10px] text-gray-400 flex items-center gap-1 cursor-pointer">
                                     <div onClick={()=>setConfig({...config, schedule_daily: !config.schedule_daily})} className={`w-3 h-3 border rounded-sm flex items-center justify-center ${config.schedule_daily ? "bg-blue-600 border-blue-600":"border-gray-500"}`}>
                                         {config.schedule_daily && <CheckSquare size={10} className="text-white"/>}
@@ -684,18 +734,18 @@ export default function App() {
                             </div>
                         )}
                         <label className="text-[10px] text-gray-400 block mb-1">Intervalo entre Posts (segundos)</label>
-                        <input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.post_interval_seconds} onChange={e=>setConfig({...config, post_interval_seconds: parseInt(e.target.value)||60})}/>
+                        <input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.post_interval_seconds || 60} onChange={e=>setConfig({...config, post_interval_seconds: parseInt(e.target.value)||60})}/>
                     </div>
 
                     <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
-                        {config.active_channels.map((ch, i) => (
+                        {channelsToRender.map((ch, i) => (
                             <div key={i} className="bg-gray-800 p-3 rounded border border-gray-600 relative group">
                                 <div className="flex gap-2 items-end mb-2">
-                                    <div className="flex-1"><label className="text-[10px] text-gray-400 font-bold block mb-1">Destino {ch.num}</label><input className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-green-500 focus:outline-none" placeholder={`ID Canal ${ch.num}`} value={ch.id} onChange={e=>updateChannel(i,'id',e.target.value)}/></div>
-                                    <div className="w-16"><label className="text-[10px] text-gray-400 block mb-1">Limite</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs text-center focus:border-green-500 focus:outline-none" value={ch.limit} onChange={e=>updateChannel(i,'limit',e.target.value)}/></div>
-                                    {config.active_channels.length > 1 && <button onClick={()=>removeChannel(i)} className="h-[34px] w-[34px] flex items-center justify-center bg-red-900/20 text-red-500 border border-red-900/30 rounded hover:bg-red-900/50 transition"><Trash2 size={16}/></button>}
+                                    <div className="flex-1"><label className="text-[10px] text-gray-400 font-bold block mb-1">Destino {ch.num}</label><input className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-green-500 focus:outline-none" placeholder={`ID Canal ${ch.num}`} value={ch.id || ""} onChange={e=>updateChannel(i,'id',e.target.value)}/></div>
+                                    <div className="w-16"><label className="text-[10px] text-gray-400 block mb-1">Limite</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs text-center focus:border-green-500 focus:outline-none" value={ch.limit || 10} onChange={e=>updateChannel(i,'limit',e.target.value)}/></div>
+                                    {channelsToRender.length > 1 && <button onClick={()=>removeChannel(i)} className="h-[34px] w-[34px] flex items-center justify-center bg-red-900/20 text-red-500 border border-red-900/30 rounded hover:bg-red-900/50 transition"><Trash2 size={16}/></button>}
                                 </div>
-                                <textarea className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-blue-500 focus:outline-none min-h-[60px] mb-2" placeholder={`Legenda personalizada... {filename}`} value={ch.caption} onChange={e=>updateChannel(i,'caption',e.target.value)}/>
+                                <textarea className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-xs focus:border-blue-500 focus:outline-none min-h-[60px] mb-2" placeholder={`Legenda personalizada... {filename}`} value={ch.caption || ""} onChange={e=>updateChannel(i,'caption',e.target.value)}/>
                                 <div className="flex gap-2">
                                     <button onClick={() => openRulesModal(i)} className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 border border-gray-600 flex justify-center items-center gap-1 transition">
                                         <Edit3 size={12}/> Regras
@@ -707,7 +757,7 @@ export default function App() {
                             </div>
                         ))}
                     </div>
-                    {config.active_channels.length < 5 && <button onClick={addChannel} className="mt-3 w-full py-2 border border-dashed border-gray-500 text-gray-400 rounded hover:bg-gray-800 text-xs flex justify-center items-center gap-1 transition"><PlusCircle size={14}/> Adicionar Canal</button>}
+                    {channelsToRender.length < 5 && <button onClick={addChannel} className="mt-3 w-full py-2 border border-dashed border-gray-500 text-gray-400 rounded hover:bg-gray-800 text-xs flex justify-center items-center gap-1 transition"><PlusCircle size={14}/> Adicionar Canal</button>}
                 </div>
                 
                 <div className="flex gap-2 pt-2">
@@ -732,9 +782,15 @@ export default function App() {
             </div>
           </div>
           <div className="flex-1 bg-gray-950 rounded-lg p-4 font-mono text-xs overflow-y-auto mb-4 border border-gray-700 shadow-inner">
-            {logs.length === 0 && <div className="text-gray-600 text-center mt-20">O sistema está pronto.<br/>Configure e clique em INICIAR.</div>}
-            {logs.map((l, i) => (
-                <div key={i} className="mb-1.5 border-b border-gray-900/50 pb-1 last:border-0"><span className="text-gray-500 select-none">[{l.time}]</span> <span className={l.level==="ERROR"?"text-red-400 font-bold":l.level==="SUCCESS"?"text-green-400 font-bold":l.level==="WARNING"?"text-yellow-400":"text-blue-300"}>{l.level==="INFO"?"ℹ":l.level==="SUCCESS"?"✔":l.level==="WARNING"?"⚠️":l.level==="ERROR"?"✖":"⚙"}</span> <span className="text-gray-300">{l.msg}</span></div>
+            {(logs || []).length === 0 && <div className="text-gray-600 text-center mt-20">O sistema está pronto.<br/>Configure e clique em INICIAR.</div>}
+            {(logs || []).map((l, i) => (
+                <div key={i} className="mb-1.5 border-b border-gray-900/50 pb-1 last:border-0">
+                    <span className="text-gray-500 select-none">[{l.time}]</span> 
+                    <span className={l.level==="ERROR"?"text-red-400 font-bold":l.level==="SUCCESS"?"text-green-400 font-bold":l.level==="WARNING"?"text-yellow-400":"text-blue-300"}>
+                        {l.level==="INFO"?"ℹ":l.level==="SUCCESS"?"✔":l.level==="WARNING"?"⚠️":l.level==="ERROR"?"✖":"⚙"}
+                    </span> 
+                    <span className="text-gray-300 ml-1">{String(l.msg)}</span>
+                </div>
             ))}
             <div ref={logEndRef} />
           </div>

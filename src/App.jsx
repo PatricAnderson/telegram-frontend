@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2, AlertTriangle, FileJson, CheckSquare, Square as SquareIcon, LogOut, User, Save, RotateCcw, CreditCard, Lock, X, Copy, RefreshCw, Shield, Edit3, ArrowRight, Clock, Hash, Link } from 'lucide-react';
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
+// Substitua pelos seus links do Railway
 const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
 const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
 
@@ -14,6 +15,46 @@ const DEFAULT_CONFIG = {
     schedule_enabled: false, schedule_time: "09:00", schedule_daily: true,
     active_channels: [{ num: 1, id: "", limit: 10, caption: "", replacements: [], buttons: [] }]
 };
+
+// --- ESCUDO DE ERROS (EVITA A TELA BRANCA) ---
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+    }
+
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error("Erro capturado pelo ErrorBoundary:", error, errorInfo);
+        this.setState({ errorInfo });
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-10 text-center font-sans">
+                    <AlertTriangle size={64} className="text-red-500 mb-4" />
+                    <h1 className="text-3xl font-bold mb-2 text-red-400">Ops! Ocorreu um Erro Crítico.</h1>
+                    <p className="text-gray-400 mb-6 text-lg">Em vez de ficar com o ecrã branco, o sistema intercetou a falha de renderização.</p>
+                    <div className="bg-black p-4 rounded-lg text-left text-sm text-red-300 max-w-4xl w-full overflow-auto border border-red-900 mb-6 max-h-96">
+                        <p className="font-bold mb-2">{this.state.error && this.state.error.toString()}</p>
+                        <pre className="whitespace-pre-wrap">{this.state.errorInfo && this.state.errorInfo.componentStack}</pre>
+                    </div>
+                    <button 
+                        onClick={() => window.location.reload()} 
+                        className="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-lg font-bold transition shadow-lg flex items-center gap-2"
+                    >
+                        <RefreshCw size={18} /> Recarregar Painel
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 // --- MODAL DE BOTÕES INLINE ---
 const ButtonModal = ({ isOpen, onClose, buttons, onSave }) => {
@@ -166,7 +207,7 @@ const AdminPanel = ({ isOpen, onClose, authFetch }) => {
 
     useEffect(() => { if (isOpen) { loadUsers(); loadKeys(); } }, [isOpen]);
 
-    const loadUsers = async () => { try { const res = await authFetch("/admin/users"); setUsers(await res.json()); } catch(e) {} };
+    const loadUsers = async () => { try { const res = await authFetch("/admin/users"); setUsers(await res.json()); } catch(e) { console.error(e); } };
     const loadKeys = async () => { try { const res = await authFetch("/admin/keys"); setKeys(await res.json()); } catch(e) {} };
 
     const handleAddTime = async (username) => {
@@ -332,7 +373,7 @@ const RenewModal = ({ isOpen, onClose, authFetch, refreshStatus, isLocked }) => 
                 {mode === "pix" && pixData && (
                     <div className="text-center animate-fade-in">
                         <p className="text-yellow-400 font-bold mb-4">Pagamento Pendente</p>
-                        <div className="bg-white p-2 rounded inline-block mb-4"><div className="w-48 h-48 flex items-center justify-center bg-gray-100 text-black text-xs p-2 overflow-hidden break-words">{pixData.qr_code_base64 ? <img src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} className="w-full h-full object-contain"/> : "QR Indisponível"}</div></div>
+                        <div className="bg-white p-2 rounded inline-block mb-4"><div className="w-48 h-48 flex items-center justify-center bg-gray-100 text-black text-xs p-2 overflow-hidden break-words">{pixData.qr_code_base64 ? <img src={`data:image/jpeg;base64,${pixData.qr_code_base64}`} className="w-full h-full object-contain" alt="QR Code"/> : "QR Indisponível"}</div></div>
                         <p className="text-white text-lg font-bold mb-4">R$ {pixData.amount.toFixed(2)}</p>
                         <button onClick={() => {navigator.clipboard.writeText(pixData.qr_code); alert("Copiado!");}} className="w-full bg-green-600 hover:bg-green-500 py-2 rounded flex items-center justify-center gap-2 font-bold transition text-white mb-2"><Copy size={16}/> Copiar Código Pix</button>
                         <button onClick={() => setMode("select")} className="text-xs text-gray-400 hover:text-white">Voltar</button>
@@ -356,7 +397,7 @@ const PaymentLockScreen = ({ onLogout, onOpenRenew }) => (
     <div className="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full text-center border border-red-900/50">
       <Lock size={48} className="text-red-500 mx-auto mb-4" />
       <h2 className="text-2xl font-bold text-white mb-2">Acesso Expirado</h2>
-      <p className="text-gray-400 mb-8">Sua assinatura terminou. Renove para continuar.</p>
+      <p className="text-gray-400 mb-8">A sua assinatura terminou. Renove para continuar a usar o sistema.</p>
       <div className="space-y-3">
         <button onClick={onOpenRenew} className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold flex justify-center gap-2"><CreditCard size={18}/> Renovar Agora</button>
         <button onClick={onLogout} className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-3 rounded font-medium">Sair</button>
@@ -408,11 +449,11 @@ const SystemLogin = ({ onLogin }) => {
     );
 };
 
-// --- COMPONENTE PRINCIPAL ---
-export default function App() {
+// --- LOGICA PRINCIPAL DA APLICAÇÃO ---
+function MainApp() {
   const [authToken, setAuthToken] = useState(localStorage.getItem("authToken"));
   const [currentUser, setCurrentUser] = useState(localStorage.getItem("currentUser"));
-  const [subscription, setSubscription] = useState({ active: false, days_left: 0 });
+  const [subscription, setSubscription] = useState({ active: true, days_left: 0 }); // Previne bloqueio visual prematuro
   const [isStatusLoaded, setIsStatusLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   
@@ -466,7 +507,7 @@ export default function App() {
               setSubscription(data.subscription || { active: false, days_left: 0 });
               setIsAdmin(data.username === "admin");
           }
-      } catch (e) { console.error("Erro status:", e); }
+      } catch (e) {}
       finally { setIsStatusLoaded(true); }
   };
 
@@ -484,7 +525,7 @@ export default function App() {
             try {
                 const d = JSON.parse(e.data);
                 if (d.type==="log") setLogs(p => [...(p || []), { level: d.level, msg: d.message, time: new Date().toLocaleTimeString() }]);
-                else if (d.type==="status") setStatus(d.status);
+                else if (d.type==="status") setStatus(d.status || "Ocioso");
             } catch {}
         };
         ws.onclose = (e) => { if(e.code===1008) handleLogout(); };
@@ -492,9 +533,10 @@ export default function App() {
     }
   }, [authToken]);
 
-  useEffect(() => logEndRef.current?.scrollIntoView({ behavior: "smooth" }), [logs]);
+  useEffect(() => {
+      try { logEndRef.current?.scrollIntoView({ behavior: "smooth" }); } catch(e){}
+  }, [logs]);
   
-  // Função defensiva para adicionar logs
   const addLog = (level, msg) => setLogs(prev => [...(prev || []), { level, msg, time: new Date().toLocaleTimeString() }]);
 
   const handleSetStartId = async () => {
@@ -506,9 +548,7 @@ export default function App() {
 
       try {
           const res = await authFetch("/set_start_id", { 
-              method: "POST", 
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ start_id: id })
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ start_id: id })
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.detail);
@@ -654,7 +694,7 @@ export default function App() {
   if (!subscription?.active || subscription?.days_left <= 0) return <PaymentLockScreen onLogout={handleLogout} onOpenRenew={() => setShowRenewModal(true)} />;
 
   // Variável segura para mapear canais sem crash
-  const channelsToRender = config.active_channels || [];
+  const channelsToRender = config?.active_channels || [];
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans p-6">
@@ -697,44 +737,44 @@ export default function App() {
             
             <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                    <div><label className="text-xs text-gray-400 block mb-1">API ID</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_id || ""} onChange={e=>setConfig({...config, api_id: e.target.value})}/></div>
-                    <div><label className="text-xs text-gray-400 block mb-1">API Hash</label><input type="password" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.api_hash || ""} onChange={e=>setConfig({...config, api_hash: e.target.value})}/></div>
+                    <div><label className="text-xs text-gray-400 block mb-1">API ID</label><input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config?.api_id || ""} onChange={e=>setConfig(prev=>({...prev, api_id: e.target.value}))}/></div>
+                    <div><label className="text-xs text-gray-400 block mb-1">API Hash</label><input type="password" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config?.api_hash || ""} onChange={e=>setConfig(prev=>({...prev, api_hash: e.target.value}))}/></div>
                 </div>
-                <div><label className="text-xs text-gray-400 block mb-1">Bot Token</label><input className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.bot_token || ""} onChange={e=>setConfig({...config, bot_token: e.target.value})}/></div>
+                <div><label className="text-xs text-gray-400 block mb-1">Bot Token</label><input className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config?.bot_token || ""} onChange={e=>setConfig(prev=>({...prev, bot_token: e.target.value}))}/></div>
                 
                 <div className="p-4 bg-gray-700/30 rounded-lg border border-gray-600">
                     <div className="flex justify-between items-start mb-3">
                         <label className="text-sm font-semibold text-yellow-400">Origem</label>
                         <div className="flex gap-2">
                             {['photos', 'videos', 'gifs'].map(t => (
-                                <button key={t} onClick={()=>setConfig({...config, [`filter_${t}`]: !config[`filter_${t}`]})} className={`text-[10px] px-2 py-0.5 rounded border ${config[`filter_${t}`] ? 'bg-green-900/30 border-green-800 text-green-300':'bg-gray-800 border-gray-700 text-gray-500'}`}>
+                                <button key={t} onClick={()=>setConfig(prev=>({...prev, [`filter_${t}`]: !prev[`filter_${t}`]}))} className={`text-[10px] px-2 py-0.5 rounded border ${config?.[`filter_${t}`] ? 'bg-green-900/30 border-green-800 text-green-300':'bg-gray-800 border-gray-700 text-gray-500'}`}>
                                     {t.toUpperCase()}
                                 </button>
                             ))}
                         </div>
                     </div>
-                    <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config.source_channel_id || ""} onChange={e=>setConfig({...config, source_channel_id: parseInt(e.target.value)||""})}/>
+                    <input placeholder="ID Canal Origem (-100...)" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm mb-4 focus:border-yellow-500 focus:outline-none" value={config?.source_channel_id || ""} onChange={e=>setConfig(prev=>({...prev, source_channel_id: parseInt(e.target.value)||""}))}/>
                     
                     <div className="mb-4 bg-gray-800/50 p-3 rounded border border-gray-600/50">
                         <div className="flex justify-between items-center mb-2">
                             <label className="text-[11px] text-gray-400 flex items-center gap-1"><Clock size={12}/> Agendamento Automático</label>
-                            <button onClick={()=>setConfig({...config, schedule_enabled: !config.schedule_enabled})} className={`w-8 h-4 rounded-full transition relative ${config.schedule_enabled ? "bg-green-600":"bg-gray-600"}`}>
-                                <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-all ${config.schedule_enabled ? "right-0.5":"left-0.5"}`}></div>
+                            <button onClick={()=>setConfig(prev=>({...prev, schedule_enabled: !prev.schedule_enabled}))} className={`w-8 h-4 rounded-full transition relative ${config?.schedule_enabled ? "bg-green-600":"bg-gray-600"}`}>
+                                <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-all ${config?.schedule_enabled ? "right-0.5":"left-0.5"}`}></div>
                             </button>
                         </div>
-                        {config.schedule_enabled && (
+                        {config?.schedule_enabled && (
                             <div className="flex gap-2 items-center mb-3 animate-fade-in">
-                                <input type="time" className="bg-gray-900 border border-gray-600 text-white text-xs rounded p-1" value={config.schedule_time || "09:00"} onChange={e=>setConfig({...config, schedule_time: e.target.value})}/>
+                                <input type="time" className="bg-gray-900 border border-gray-600 text-white text-xs rounded p-1" value={config?.schedule_time || "09:00"} onChange={e=>setConfig(prev=>({...prev, schedule_time: e.target.value}))}/>
                                 <label className="text-[10px] text-gray-400 flex items-center gap-1 cursor-pointer">
-                                    <div onClick={()=>setConfig({...config, schedule_daily: !config.schedule_daily})} className={`w-3 h-3 border rounded-sm flex items-center justify-center ${config.schedule_daily ? "bg-blue-600 border-blue-600":"border-gray-500"}`}>
-                                        {config.schedule_daily && <CheckSquare size={10} className="text-white"/>}
+                                    <div onClick={()=>setConfig(prev=>({...prev, schedule_daily: !prev.schedule_daily}))} className={`w-3 h-3 border rounded-sm flex items-center justify-center ${config?.schedule_daily ? "bg-blue-600 border-blue-600":"border-gray-500"}`}>
+                                        {config?.schedule_daily && <CheckSquare size={10} className="text-white"/>}
                                     </div>
                                     Repetir Diariamente
                                 </label>
                             </div>
                         )}
                         <label className="text-[10px] text-gray-400 block mb-1">Intervalo entre Posts (segundos)</label>
-                        <input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config.post_interval_seconds || 60} onChange={e=>setConfig({...config, post_interval_seconds: parseInt(e.target.value)||60})}/>
+                        <input type="number" className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-sm focus:border-blue-500 focus:outline-none" value={config?.post_interval_seconds ?? 60} onChange={e=>setConfig(prev=>({...prev, post_interval_seconds: parseInt(e.target.value)||60}))}/>
                     </div>
 
                     <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
@@ -785,11 +825,11 @@ export default function App() {
             {(logs || []).length === 0 && <div className="text-gray-600 text-center mt-20">O sistema está pronto.<br/>Configure e clique em INICIAR.</div>}
             {(logs || []).map((l, i) => (
                 <div key={i} className="mb-1.5 border-b border-gray-900/50 pb-1 last:border-0">
-                    <span className="text-gray-500 select-none">[{l.time}]</span> 
-                    <span className={l.level==="ERROR"?"text-red-400 font-bold":l.level==="SUCCESS"?"text-green-400 font-bold":l.level==="WARNING"?"text-yellow-400":"text-blue-300"}>
-                        {l.level==="INFO"?"ℹ":l.level==="SUCCESS"?"✔":l.level==="WARNING"?"⚠️":l.level==="ERROR"?"✖":"⚙"}
+                    <span className="text-gray-500 select-none">[{String(l?.time || "")}]</span> 
+                    <span className={l?.level==="ERROR"?"text-red-400 font-bold":l?.level==="SUCCESS"?"text-green-400 font-bold":l?.level==="WARNING"?"text-yellow-400":"text-blue-300"}>
+                        {l?.level==="INFO"?"ℹ":l?.level==="SUCCESS"?"✔":l?.level==="WARNING"?"⚠️":l?.level==="ERROR"?"✖":"⚙"}
                     </span> 
-                    <span className="text-gray-300 ml-1">{String(l.msg)}</span>
+                    <span className="text-gray-300 ml-1">{l?.msg ? String(l.msg) : ""}</span>
                 </div>
             ))}
             <div ref={logEndRef} />
@@ -817,5 +857,14 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+// O App real é "agarrado" pelo ErrorBoundary
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
   );
 }

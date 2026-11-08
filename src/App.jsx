@@ -3,8 +3,8 @@ import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2,
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // Substitua pelos seus links do Railway
-const API_URL = "https://taxi-studying-ads-writers.trycloudflare.com/"; 
-const WS_URL = "wss://taxi-studying-ads-writers.trycloudflare.com/";
+const API_URL = "https://taxi-studying-ads-writers.trycloudflare.com"; 
+const WS_URL = "wss://taxi-studying-ads-writers.trycloudflare.com/ws";
 
 const APP_NAME = "Painel do Cliente";
 

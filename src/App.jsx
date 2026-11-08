@@ -3,8 +3,8 @@ import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2,
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // Substitua pelos seus links do Railway
-const API_URL = "https://cord-elsewhere-side-translation.trycloudflare.com"; 
-const WS_URL = "wss://cord-elsewhere-side-translation.trycloudflare.com/ws";
+const API_URL = "https://genealogy-promise-lock-programmes.trycloudflare.com"; 
+const WS_URL = "wss://genealogy-promise-lock-programmes.trycloudflare.com/ws";
 
 const APP_NAME = "Painel do Cliente";
 

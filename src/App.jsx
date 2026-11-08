@@ -3,8 +3,8 @@ import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2,
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // Substitua pelos seus links do Railway
-const API_URL = "https://telegram-backend-production-1c72.up.railway.app"; 
-const WS_URL = "wss://telegram-backend-production-1c72.up.railway.app/ws";
+const API_URL = "https://taxi-studying-ads-writers.trycloudflare.com/"; 
+const WS_URL = "wss://taxi-studying-ads-writers.trycloudflare.com/";
 
 const APP_NAME = "Painel do Cliente";
 

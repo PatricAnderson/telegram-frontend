@@ -3,8 +3,8 @@ import { Terminal, Play, Square, Activity, KeyRound, Upload, PlusCircle, Trash2,
 
 // --- CONFIGURAÇÃO OBRIGATÓRIA ---
 // Substitua pelos seus links do Railway
-const API_URL = "https://occasion-picking-capacity-ram.trycloudflare.com"; 
-const WS_URL = "wss://occasion-picking-capacity-ram.trycloudflare.com/ws";
+const API_URL = "https://switches-thank-earth-firmware.trycloudflare.com"; 
+const WS_URL = "wss://switches-thank-earth-firmware.trycloudflare.com/ws";
 
 const APP_NAME = "Painel do Cliente";
 
